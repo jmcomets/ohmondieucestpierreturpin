@@ -1,0 +1,12 @@
+.push {
+    margin-top: 200px;
+}
+
+.btn-xl {
+    padding: 18px 28px;
+    font-size: 42px; /*change this to your desired size*/
+    line-height: normal;
+    -webkit-border-radius: 8px;
+    -moz-border-radius: 8px;
+    border-radius: 8px;
+}

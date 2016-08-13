@@ -86,9 +86,12 @@ Controls.prototype.$element = function() {
   var $buttons = [];
   for (var id in this.buttons) {
     id = parseInt(id);
-    var $btn = $("<button></button>");
-    $btn.text(this.buttons[id] + " [" + id + "]");
-    //$button.addClass("TODO");
+    var $btn = $("<button type=\"button\"></button>");
+    $btn.html(
+        " <span class=\"pull-left\">[" + id + "]</span>"
+        + this.buttons[id]
+        );
+    $btn.addClass("btn btn-default btn-lg");
 
     // JS = caca
     (function(id) {
@@ -103,6 +106,7 @@ Controls.prototype.$element = function() {
   //shuffleArray($buttons);
 
   var $e = $("<div></div>");
+  $e.addClass("btn-group-vertical");
   for (var i = 0; i < $buttons.length; i++) {
     $buttons[i].appendTo($e);
   }
@@ -146,7 +150,7 @@ KeyLogger.prototype.hit = function(id, type) {
   this.events.push({ type: type, id: id, time: t });
 };
 
-var Animator = function(video, startTime, endTime) {
+var VideoController = function(video, startTime, endTime) {
   this.video = video;
 
   this.startTime = startTime;
@@ -155,16 +159,16 @@ var Animator = function(video, startTime, endTime) {
   this.endTimeoutId = -1;
 };
 
-Animator.prototype.setKeyLogger = function(keyLogger) {
+VideoController.prototype.setKeyLogger = function(keyLogger) {
   this.keyLogger = keyLogger;
 };
 
-Animator.prototype.start = function() {
+VideoController.prototype.start = function() {
   this.video.play();
   this.loop();
 };
 
-Animator.prototype.loop = function() {
+VideoController.prototype.loop = function() {
   var self = this;
   var duration = self.endTime - self.startTime;
 
@@ -179,7 +183,7 @@ Animator.prototype.loop = function() {
   loopFn();
 };
 
-Animator.prototype.cancel = function() {
+VideoController.prototype.cancel = function() {
   if (this.endTimeoutId != -1) {
     clearTimeout(this.endTimeoutId);
   }
@@ -193,13 +197,17 @@ $(function() {
   var $info = $("#info");
   var $controls = $("#controls");
 
+  var $step1 = $("#step1");
+  var $step2 = $("#step2");
+  var $step3 = $("#step3");
+
   var keyLogger = new KeyLogger();
 
   var startTime = 0 * 60 + 3.3;
   var endTime = 1 * 60 + 42.2;
 
-  var animator = new Animator($video.get(0), startTime, endTime);
-  animator.setKeyLogger(keyLogger);
+  var videoController = new VideoController($video.get(0), startTime, endTime);
+  videoController.setKeyLogger(keyLogger);
 
   var controls = new Controls();
 
@@ -226,33 +234,39 @@ $(function() {
     return false;
   });
 
-  // kick off
-  $button.click(function() {
-    $button.hide();
-
-    // start handling events
+  function ready() {
     eventDispatcher.accept(controls.getKeyIds());
     keyLogger.start();
+  }
+
+  function go() {
+    videoController.start();
+    controls.$element().appendTo($controls);
+  }
+
+  // kick off
+  $button.click(function() {
+    // start handling events
+    ready();
+
+    $button.hide();
 
     // show and start the countdown
-    $counterDown.show();
+    $counterDown.fadeIn();
     $counterDown.counter("start");
 
-    // ~callback
+    // welcome to callback hell
     setTimeout(function() {
-      $counterDown.hide();
-
-      // show a flash message
-      $info.fadeIn(function() {
-        setTimeout(function() {
-          $info.fadeOut(function() {
-            $video.fadeIn(function() {
-              animator.start();
-
-              controls.$element().appendTo($controls);
+      $step1.fadeOut(function() {
+        $step2.fadeIn(function() {
+          setTimeout(function() {
+            $step2.fadeOut(function() {
+              $step3.fadeIn(function() {
+                go();
+              });
             });
-          });
-        }, flashDuration * 1000)
+          }, flashDuration * 1000)
+        });
       });
 
     }, countDownDuration);

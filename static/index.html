@@ -7,17 +7,36 @@
   <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0" />
   <title>OH MON DIEU C'EST PIERRE TURPIN !!!</title>
   <link href="/static/css/bootstrap.min.css" rel="stylesheet" type="text/css">
+  <link href="/static/css/main.css" rel="stylesheet" type="text/css">
   </head>
   <body>
     <div class="container">
-      <h1 id="info" class="" style="display:none">Follow the melody!</h1>
-      <video id="video" style="display:none">
-        <source src="/static/video.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-      </video>
-      <span id="counter-down" class="" style="display:none"></span>
-      <button class="btn btn-block" id="trigger">Go!</button>
-      <div id="controls"></div>
+      <div class="push"></div>
+      <div id="step1" class="row">
+        <div class="col-md-12 text-center">
+          <button id="trigger" type="button" class="btn btn-primary btn-xl">
+            <span class="glyphicon glyphicon-play"></span>
+          </button>
+          <h2 id="counter-down" style="display:none"></h2>
+        </div>
+      </div>
+      <div id="step2" class="row" style="display:none">
+        <div class="col-md-12 text-center">
+          <h1 id="info">Follow the melody!</h1>
+        </div>
+      </div>
+      <div id="step3" class="row" style="display:none">
+        <div class="col-md-11">
+          <div style="width:100%;height:0;padding-bottom:66%">
+            <video id="video" style="width=100%;height=100%">
+              <source src="/static/video.mp4" type="video/mp4">
+                Get yourself a real browser, fool!
+            </video>
+          </div>
+        </div>
+        <div id="controls" class="col-md-1">
+        </div>
+      </div>
     </div>
     <script src="/static/js/jquery.min.js" type="text/javascript"></script>
     <script src="/static/js/jquery.easing.js" type="text/javascript"></script>
