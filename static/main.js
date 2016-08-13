@@ -84,6 +84,40 @@ KeyLogger.prototype.hit = function(id) {
   this.events.push(t - this.startTime);
 };
 
+var Animator = function(startTime, endTime) {
+  this.startTime = startTime;
+  this.endTime = endTime;
+
+  this.endTimeoutId = -1;
+};
+
+Animator.prototype.bindTo = function(video) {
+  this.video = video;
+};
+
+Animator.prototype.start = function() {
+  this.video.play();
+  this.loop();
+};
+
+Animator.prototype.loop = function() {
+  var self = this;
+  var duration = self.endTime - self.startTime;
+
+  var loopFn = function() {
+    self.video.currentTime = self.startTime;
+    self.endTimeoutId = setTimeout(loopFn, duration * 1000);
+  };
+
+  loopFn();
+};
+
+Animator.prototype.cancel = function() {
+  if (this.endTimeoutId != -1) {
+    clearTimeout(this.endTimeoutId);
+  }
+};
+
 $(function() {
   // dom objects
   var $button = $("#trigger");
@@ -93,6 +127,12 @@ $(function() {
 
   var keyLogger = new KeyLogger();
 
+  var startTime = 0 * 60 + 3.3;
+  var endTime = 1 * 60 + 42.2;
+
+  var animator = new Animator(startTime, endTime);
+  animator.bindTo($video.get(0));
+
   // bind the key press dispatcher to the window
   var eventDispatcher = new EventDispatcher();
   eventDispatcher.onPress(function() { keyLogger.hit("down"); });
@@ -100,7 +140,7 @@ $(function() {
   eventDispatcher.bindTo($(window));
 
   var countDownDuration = 3000;
-  var endTime = 1 * 60 + 42;
+  var flashDuration = 3;
 
   $counterDown.text(countDownDuration);
 
@@ -131,18 +171,16 @@ $(function() {
     setTimeout(function() {
       $counterDown.hide();
 
-      $video.fadeIn();
-
       // show a flash message
-      var flashDuration = 3;
-      $info.fadeIn();
-      setTimeout(function() { $info.fadeOut(); }, flashDuration * 1000)
-
-      // start the video
-      var video = $video.get(0);
-      video.play();
-      // loop video
-      setTimeout(function() { video.currentTime = 3; }, endTime * 1000);
+      $info.fadeIn(function() {
+        setTimeout(function() {
+          $info.fadeOut(function() {
+            $video.fadeIn(function() {
+              animator.start();
+            });
+          });
+        }, flashDuration * 1000)
+      });
 
     }, countDownDuration);
   });
