@@ -1,18 +1,22 @@
 "use strict";
 
-var EventDispatcher = function() {
+var Shortcuts = function() {
   this.acceptedIds = {};
-  this.keyDown = false;
+  this.keyPressed = {};
   this.listeners = {press: [], release: []};
 };
 
-EventDispatcher.prototype.accept = function(keys) {
+Shortcuts.prototype.disable = function() {
+  this.acceptedIds = {};
+};
+
+Shortcuts.prototype.accept = function(keys) {
   for (var i = 0; i < keys.length; i++) {
     this.acceptedIds[keys[i]] = true;
   }
 };
 
-EventDispatcher.prototype.bindTo = function($obj) {
+Shortcuts.prototype.bindTo = function($obj) {
   var self = this;
 
   var trigger = function(type, id) {
@@ -23,32 +27,33 @@ EventDispatcher.prototype.bindTo = function($obj) {
   };
 
   $obj.on("keydown", function(e) {
-    if (self.keyDown) {
+    var id = e.which;
+    if (self.keyPressed[id]) {
       return;
     }
-    self.keyDown = true;
+    self.keyPressed[id] = true;
 
-    var id = e.which;
     if (self.acceptedIds[id]) {
       trigger("press", id)
     }
   });
 
   $obj.on("keyup", function(e) {
-    self.keyDown = false;
-
     var id = e.which;
+
+    self.keyPressed[id] = false;
+
     if (self.acceptedIds[id]) {
       trigger("release", id)
     }
   });
 };
 
-EventDispatcher.prototype.onPress = function(fn) {
+Shortcuts.prototype.onPress = function(fn) {
   this.listeners.press.push(fn);
 };
 
-EventDispatcher.prototype.onRelease = function(fn) {
+Shortcuts.prototype.onRelease = function(fn) {
   this.listeners.release.push(fn);
 };
 
@@ -69,10 +74,10 @@ Button.prototype.onHit = function(fn) {
   this.listeners.push(fn);
 };
 
-Button.prototype.hit = function() {
+Button.prototype.notifyListeners = function(type) {
   var self = this;
   for (var i = 0; i < self.listeners.length; i++) {
-    self.listeners[i](self.id);
+    self.listeners[i](self.id, type);
   }
 };
 
@@ -103,25 +108,17 @@ Button.prototype.makeElement = function() {
       + self.text
       );
 
-  $btn.click(function() { self.hit(); });
+  $btn.mousedown(function() { self.notifyListeners("press"); });
+  $btn.mouseup(function() { self.notifyListeners("release"); });
 
   return $btn;
 };
 
-var Controls = function() {
-  this.baseId = 48;
+var Controls = function(buttonDefinitions, baseId) {
+  this.baseId = baseId;
+  this.buttonDefinitions = buttonDefinitions;
 
-  this.buttonDefinitions = {
-    1: "They're taking the Hobbits",
-    2: "To Isen",
-    3: "Gard",
-    4: "What did you say?",
-    5: "The Hobbits",
-    6: "Tell me where is Gandalf",
-    7: "For I much desire to speak with him",
-    8: "The Balrog of Morgoth",
-    9: "Stupid fatsy Hobbit"
-  };
+  this.listeners = [];
 
   this.buttons = this.makeButtons();
   this.$e = this.makeElement();
@@ -137,11 +134,9 @@ Controls.prototype.makeButtons = function() {
     var btn = new Button(id, self.buttonDefinitions[id]);
 
     // JS = caca
-    (function(id) {
-      btn.onHit(function() {
-        self.hit(self.baseId + id);
-      });
-    })(id);
+    btn.onHit(function(id, type) {
+      self.hit(self.baseId + id);
+    });
 
     buttons[id] = btn;
   }
@@ -176,15 +171,26 @@ Controls.prototype.setStatus = function(id, statusCode) {
   }
 };
 
-Controls.prototype.hit = function(code) {
+Controls.prototype.hit = function(code, type) {
+  console.log("Controls::hit");
   var id = code - this.baseId;
-  console.log("hit:", id);
 
-  var self = this;
-  self.setStatus(id, "info");
-  setTimeout(function() {
-    self.clearStatus(id);
-  }, 1 * 1000);
+  // clear the status when releasing the key
+  if (type == "press") {
+    this.notifyListeners(id);
+  } else {
+    this.clearStatus(id);
+  }
+};
+
+Controls.prototype.notifyListeners = function(id) {
+  for (var i = 0; i < this.listeners.length; i++) {
+    this.listeners[i](id);
+  }
+};
+
+Controls.prototype.onHit = function(fn) {
+  this.listeners.push(fn);
 };
 
 Controls.prototype.getKeyIds = function() {
@@ -196,32 +202,6 @@ Controls.prototype.getKeyIds = function() {
   return keyIds;
 };
 
-var KeyLogger = function() {
-  this.startTime = 0;
-  this.events = [];
-};
-
-function getTimestamp() {
-  return new Date().getTime();
-}
-
-KeyLogger.prototype.start = function() {
-  this.startTime = getTimestamp();
-};
-
-KeyLogger.prototype.press = function(id) {
-  this.hit(id, "press");
-};
-
-KeyLogger.prototype.release = function(id) {
-  this.hit(id, "release");
-};
-
-KeyLogger.prototype.hit = function(id, type) {
-  var t = getTimestamp() - this.startTime;
-  this.events.push({ type: type, id: id, time: t });
-};
-
 var VideoController = function(video, startTime, endTime) {
   this.video = video;
 
@@ -229,10 +209,6 @@ var VideoController = function(video, startTime, endTime) {
   this.endTime = endTime;
 
   this.endTimeoutId = -1;
-};
-
-VideoController.prototype.setKeyLogger = function(keyLogger) {
-  this.keyLogger = keyLogger;
 };
 
 VideoController.prototype.start = function() {
@@ -245,9 +221,6 @@ VideoController.prototype.loop = function() {
   var duration = self.endTime - self.startTime;
 
   var loopFn = function() {
-    if (self.endTimeoutId != -1) {
-      console.log({ events: self.keyLogger.events });
-    }
     self.video.currentTime = self.startTime;
     self.endTimeoutId = setTimeout(loopFn, duration * 1000);
   };
@@ -261,86 +234,207 @@ VideoController.prototype.cancel = function() {
   }
 };
 
+function getTimestamp() {
+  return new Date().getTime();
+}
+
+var EventQueue = function(events) {
+  this.index = -1;
+  this.events = events;
+  this.timeoutId = -1;
+  this.listeners = {cancel: [], success: [], finished: []};
+  this.startTime = 0;
+  this.allowedError = 1000;
+};
+
+EventQueue.prototype.start = function() {
+  this.startTime = getTimestamp();
+  this.queueNextEvent();
+};
+
+EventQueue.prototype.handleEvent = function(id) {
+  console.log("EventQueue::handleEvent", this.index);
+  var t = getTimestamp() - this.startTime;
+  var currentEvent = this.events[this.index];
+  if (Math.abs(currentEvent.time - t) < this.allowedError) {
+    this.success(id);
+  } else {
+    this.cancel(id);
+  }
+};
+
+EventQueue.prototype.queueNextEvent = function() {
+  console.log("EventQueue::queueNextEvent");
+  this.index++;
+  if (this.index < this.events.length) {
+    var currentEvent = this.events[this.index];
+    var currentTime = getTimestamp() - this.startTime;
+    var t = currentEvent.time - currentTime;
+    if (t > 0) {
+      var self = this;
+      this.timeoutId = setTimeout(function() { self.cancel(currentEvent.id); }, t);
+    } else {
+      console.error("could not set timeout, negative time");
+    }
+  }
+};
+
+EventQueue.prototype.success = function(id) {
+    if (this.timeoutId != -1) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = -1;
+
+      this.queueNextEvent();
+
+      this.notifyListeners("success", id);
+    } else {
+      this.notifyListeners("finished");
+    }
+};
+
+EventQueue.prototype.cancel = function(id) {
+  this.index = 0;
+  this.startTime = getTimestamp();
+  this.notifyListeners("cancel", id);
+};
+
+EventQueue.prototype.notifyListeners = function(type) {
+  // ignore "type" argument
+  var args = Array.prototype.slice.call(arguments);
+  args = args.slice(1, args.length);
+
+  var listeners = this.listeners[type];
+  for (var i = 0; i < listeners.length; i++) {
+    var fn = listeners[i];
+    fn.apply(fn, args)
+  }
+};
+
+EventQueue.prototype.onFinished = function(fn) {
+  this.listeners.finished.push(fn);
+};
+
+EventQueue.prototype.onSuccess = function(fn) {
+  this.listeners.success.push(fn);
+};
+
+EventQueue.prototype.onCancel = function(fn) {
+  this.listeners.cancel.push(fn);
+};
+
+var Game = function(settings, videoElement, eventElement) {
+    this.videoController = new VideoController(videoElement, settings.startTime, settings.endTime);
+    this.controls = new Controls(settings.buttonDefinitions, settings.baseId);
+    this.shortcuts = new Shortcuts();
+    this.eventQueue = new EventQueue(settings.events);
+
+    var self = this;
+
+    this.shortcuts.onPress(function(code)   { self.controls.hit(code, "press"); });
+    this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
+    this.shortcuts.bindTo($(eventElement));
+
+    this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
+
+    // event queue events
+    this.eventQueue.onSuccess(function(id) { self.onSuccess(id); });
+    this.eventQueue.onFinished(function() { self.onFinished(); });
+    this.eventQueue.onCancel(function(id) { self.onCancel(id); });
+};
+
+Game.prototype.onSuccess = function(id) {
+  console.log("Game::onSuccess");
+  this.controls.setStatus(id, "success");
+};
+
+Game.prototype.onCancel = function(id) {
+  console.log("Game::onCancel");
+  this.videoController.cancel();
+  this.videoController.loop();
+  this.controls.setStatus(id, "danger");
+};
+
+Game.prototype.onFinished = function() {
+  console.log("Game::onFinished");
+  this.shortcuts.disable();
+  this.videoController.cancel();
+
+  // TODO
+};
+
+Game.prototype.start = function($controlsElement) {
+  this.shortcuts.accept(this.controls.getKeyIds());
+  this.controls.appendTo($controlsElement);
+  this.videoController.start();
+  this.eventQueue.start();
+};
+
+function getSettings(fn) {
+  $.getJSON('/static/video.json', function(settings) {
+    console.log(settings);
+    fn(settings);
+  });
+}
+
 $(function() {
   // dom objects
-  var $button = $("#trigger");
-  var $counterDown = $("#counter-down");
-  var $video = $("#video");
-  var $info = $("#info");
   var $controls = $("#controls");
 
+  // step objects
   var $step1 = $("#step1");
   var $step2 = $("#step2");
   var $step3 = $("#step3");
 
-  var keyLogger = new KeyLogger();
-
-  var startTime = 0 * 60 + 3.3;
-  var endTime = 1 * 60 + 42.2;
-
-  var videoController = new VideoController($video.get(0), startTime, endTime);
-  videoController.setKeyLogger(keyLogger);
-
-  var controls = new Controls();
-
-  // bind the key press dispatcher to the window
-  var eventDispatcher = new EventDispatcher();
-  eventDispatcher.onPress(function(code)   { controls.hit(code); });
-  eventDispatcher.onPress(function(code) { keyLogger.press(code); });
-  eventDispatcher.onRelease(function(code) { keyLogger.release(code); });
-  eventDispatcher.bindTo($(window));
-
-  var countDownDuration = 3000;
-  var flashDuration = 3;
-
-  $counterDown.text(countDownDuration);
-
-  $counterDown.counter({
-    autoStart: false,
-    countTo: 0,
-    duration: countDownDuration,
-    easing: "easeOutCubic"
-  });
-
+  // disable right click on video
+  var $video = $("#video");
   $video.on("contextmenu", function(e) {
     return false;
   });
 
-  function ready() {
-    eventDispatcher.accept(controls.getKeyIds());
-    keyLogger.start();
-  }
+  getSettings(function(settings) {
+    var game = new Game(settings, $video.get(0), window);
 
-  function go() {
-    videoController.start();
-    controls.appendTo($controls);
-  }
+    // TODO: move to settings.json
+    // var countDownDuration = 3000;
+    // var flashDuration = 3;
+    var countDownDuration = 0.5;
+    var flashDuration = 0.5;
 
-  // kick off
-  $button.click(function() {
-    // start handling events
-    ready();
+    var $counterDown = $("#counter-down");
 
-    $button.hide();
+    $counterDown.text(countDownDuration * 1000);
 
-    // show and start the countdown
-    $counterDown.fadeIn();
-    $counterDown.counter("start");
+    $counterDown.counter({
+      autoStart: false,
+      countTo: 0,
+      duration: countDownDuration * 1000,
+      easing: "easeOutCubic"
+    });
 
-    // welcome to callback hell
-    setTimeout(function() {
-      $step1.fadeOut(function() {
-        $step2.fadeIn(function() {
-          setTimeout(function() {
-            $step2.fadeOut(function() {
-              $step3.fadeIn(function() {
-                go();
+    // kick off
+    var $button = $("#trigger");
+    $button.click(function() {
+      $button.hide();
+
+      // show and start the countdown
+      $counterDown.fadeIn();
+      $counterDown.counter("start");
+
+      // welcome to callback hell
+      setTimeout(function() {
+        $step1.fadeOut(function() {
+          $step2.fadeIn(function() {
+            setTimeout(function() {
+              $step2.fadeOut(function() {
+                $step3.fadeIn(function() {
+                  game.start($controls);
+                });
               });
-            });
-          }, flashDuration * 1000)
+            }, flashDuration * 1000)
+          });
         });
-      });
 
-    }, countDownDuration);
+      }, countDownDuration);
+    });
   });
 });
