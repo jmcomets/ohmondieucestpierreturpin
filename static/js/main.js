@@ -52,16 +52,68 @@ EventDispatcher.prototype.onRelease = function(fn) {
   this.listeners.release.push(fn);
 };
 
-function getTimestamp() {
-  return new Date().getTime();
-}
+var Button = function(id, text) {
+  this.id = id;
+  this.text = text;
+  this.listeners = [];
+  this.statusCode = "";
+  this.$e = this.makeElement();
+  this.render();
+};
+
+Button.prototype.appendTo = function($container) {
+  this.$e.appendTo($container);
+};
+
+Button.prototype.onHit = function(fn) {
+  this.listeners.push(fn);
+};
+
+Button.prototype.hit = function() {
+  var self = this;
+  for (var i = 0; i < self.listeners.length; i++) {
+    self.listeners[i](self.id);
+  }
+};
+
+Button.prototype.clearStatus = function() {
+  this.statusCode = "";
+  this.render();
+};
+
+Button.prototype.setStatus = function(statusCode) {
+  this.statusCode = statusCode;
+  this.render();
+};
+
+Button.prototype.render = function() {
+  var baseClasses = ["btn", "btn-default", "btn-lg"];
+  this.$e.attr("class", baseClasses.join(" "));
+  if (this.statusCode) {
+    this.$e.addClass("btn-" + this.statusCode);
+  }
+};
+
+Button.prototype.makeElement = function() {
+  var self = this;
+
+  var $btn = $("<button type=\"button\"></button>");
+  $btn.html(
+      "<span class=\"pull-left\">[" + self.id + "]</span>"
+      + self.text
+      );
+
+  $btn.click(function() { self.hit(); });
+
+  return $btn;
+};
 
 var Controls = function() {
   this.baseId = 48;
 
-  this.buttons = {
+  this.buttonDefinitions = {
     1: "They're taking the Hobbits",
-    2: "To Isengard",
+    2: "To Isen",
     3: "Gard",
     4: "What did you say?",
     5: "The Hobbits",
@@ -70,58 +122,74 @@ var Controls = function() {
     8: "The Balrog of Morgoth",
     9: "Stupid fatsy Hobbit"
   };
+
+  this.buttons = this.makeButtons();
+  this.$e = this.makeElement();
 };
 
-function shuffleArray(array) {
-  for (var i = array.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var temp = array[i];
-    array[i] = array[j];
-    array[j] = temp;
-  }
-}
-
-Controls.prototype.$element = function() {
+Controls.prototype.makeButtons = function() {
   var self = this;
-  var $buttons = [];
-  for (var id in this.buttons) {
+
+  var buttons = {};
+  for (var id in self.buttonDefinitions) {
     id = parseInt(id);
-    var $btn = $("<button type=\"button\"></button>");
-    $btn.html(
-        " <span class=\"pull-left\">[" + id + "]</span>"
-        + this.buttons[id]
-        );
-    $btn.addClass("btn btn-default btn-lg");
+
+    var btn = new Button(id, self.buttonDefinitions[id]);
 
     // JS = caca
     (function(id) {
-      $btn.click(function() {
-      self.hit(self.baseId + id);
+      btn.onHit(function() {
+        self.hit(self.baseId + id);
       });
     })(id);
 
-    $buttons.push($btn);
+    buttons[id] = btn;
   }
 
-  //shuffleArray($buttons);
+  return buttons;
+};
 
+Controls.prototype.makeElement = function() {
   var $e = $("<div></div>");
   $e.addClass("btn-group-vertical");
-  for (var i = 0; i < $buttons.length; i++) {
-    $buttons[i].appendTo($e);
+  for (var id in this.buttons) {
+    this.buttons[id].appendTo($e);
   }
-
   return $e;
 };
 
+Controls.prototype.appendTo = function($container) {
+  this.$e.appendTo($container);
+};
+
+Controls.prototype.clearStatus = function(id) {
+  var btn = this.buttons[id];
+  if (btn) {
+    btn.clearStatus();
+  }
+};
+
+Controls.prototype.setStatus = function(id, statusCode) {
+  var btn = this.buttons[id];
+  if (btn) {
+    btn.setStatus(statusCode);
+  }
+};
+
 Controls.prototype.hit = function(code) {
-  console.log("hit:", code - this.baseId);
+  var id = code - this.baseId;
+  console.log("hit:", id);
+
+  var self = this;
+  self.setStatus(id, "info");
+  setTimeout(function() {
+    self.clearStatus(id);
+  }, 1 * 1000);
 };
 
 Controls.prototype.getKeyIds = function() {
   var keyIds = [];
-  for (var id in this.buttons)
-  {
+  for (var id in this.buttons) {
     id = parseInt(id);
     keyIds.push(this.baseId + id);
   }
@@ -132,6 +200,10 @@ var KeyLogger = function() {
   this.startTime = 0;
   this.events = [];
 };
+
+function getTimestamp() {
+  return new Date().getTime();
+}
 
 KeyLogger.prototype.start = function() {
   this.startTime = getTimestamp();
@@ -241,7 +313,7 @@ $(function() {
 
   function go() {
     videoController.start();
-    controls.$element().appendTo($controls);
+    controls.appendTo($controls);
   }
 
   // kick off
