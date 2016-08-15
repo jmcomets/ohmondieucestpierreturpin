@@ -232,6 +232,11 @@ VideoController.prototype.loop = function() {
   loopFn();
 };
 
+VideoController.prototype.restart = function() {
+  this.cancel();
+  this.loop();
+};
+
 VideoController.prototype.cancel = function() {
   if (this.endTimeoutId != -1) {
     clearTimeout(this.endTimeoutId);
@@ -256,6 +261,8 @@ EventQueue.prototype.configure = function(allowedError) {
 
 EventQueue.prototype.setEvents = function(events) {
   this.events = events;
+  console.log("events[0]", this.events[0]);
+  console.log("events[1]", this.events[1]);
 };
 
 EventQueue.prototype.start = function() {
@@ -263,10 +270,16 @@ EventQueue.prototype.start = function() {
   this.queueNextEvent();
 };
 
+EventQueue.prototype.restart = function() {
+  this.index = -1;
+  this.start();
+};
+
 EventQueue.prototype.handleEvent = function(id) {
   var t = this.getRelativeTime();
   var currentEvent = this.events[this.index];
-  if (Math.abs(t - currentEvent.time) < this.allowedError) {
+  console.log("handleEvent", {time: t, id: id}, currentEvent);
+  if (id == currentEvent.id && Math.abs(t - currentEvent.time) <= this.allowedError) {
     this.success(id);
   } else {
     this.cancel(id);
@@ -283,15 +296,18 @@ EventQueue.prototype.queueNextEvent = function() {
     // compute time til next event
     var currentEvent = this.events[this.index];
     var currentTime = this.getRelativeTime();
-    var t = currentEvent.time - currentTime;
+    var t = (currentEvent.time - currentTime) + this.allowedError;
+    console.log("queuing next event", currentEvent.time, currentTime, this.allowedError);
 
     if (t > 0) {
       var self = this;
-      this.cancelTimeoutId = setTimeout(function() { self.cancel(currentEvent.id); },
-                                  t + this.allowedError);
+      console.log("will cancel in " + (t / 1000) + " seconds");
+      this.cancelTimeoutId = setTimeout(function() { self.cancel(currentEvent.id); }, t);
     } else {
       console.error("could not set timeout, negative time");
     }
+  } else {
+    console.error("no events left");
   }
 };
 
@@ -300,8 +316,6 @@ EventQueue.prototype.success = function(id) {
       clearTimeout(this.cancelTimeoutId);
       this.cancelTimeoutId = -1;
 
-      this.queueNextEvent();
-
       this.notifyListeners("success", id);
     } else {
       this.notifyListeners("finished");
@@ -309,8 +323,6 @@ EventQueue.prototype.success = function(id) {
 };
 
 EventQueue.prototype.cancel = function(id) {
-  this.index = 0;
-  this.startTime = getTimestamp();
   this.notifyListeners("cancel", id);
 };
 
@@ -338,6 +350,33 @@ EventQueue.prototype.onCancel = function(fn) {
   this.listeners.cancel.push(fn);
 };
 
+var KeyLogger = function() {
+  this.events = [];
+  this.startTime = -1;
+
+  var self = this;
+  $("#debug").click(function() {
+    console.log("dumping current events", self.events);
+    $.ajax({
+      type: "POST",
+      url: "/debug",
+      contentType: "application/json",
+      dataType: "json",
+      data: JSON.stringify({ "events": self.events })
+    });
+    self.events = [];
+  });
+};
+
+KeyLogger.prototype.start = function() {
+  this.startTime = getTimestamp();
+};
+
+KeyLogger.prototype.handleEvent = function(id) {
+  var t = getTimestamp() - this.startTime;
+  this.events.push({time: t, id: id});
+};
+
 var Game = function($videoElement, $eventElement) {
   this.$videoElement = $videoElement;
 
@@ -354,6 +393,10 @@ var Game = function($videoElement, $eventElement) {
 
   this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
 
+  //this.keyLogger = new KeyLogger();
+  //this.controls.onHit(function(id) { self.keyLogger.handleEvent(id); });
+  //this.controls.onHit(function(id) { self.controls.setStatus(id, "warning"); });
+
   // event queue events
   this.eventQueue.onSuccess(function(id) { self.onSuccess(id); });
   this.eventQueue.onFinished(function() { self.onFinished(); });
@@ -364,6 +407,7 @@ Game.prototype.start = function($controlsElement) {
   this.shortcuts.accept(this.controls.getKeyIds());
   this.controls.appendTo($controlsElement);
   this.videoController.start();
+  //this.keyLogger.start();
   this.eventQueue.start();
 };
 
@@ -402,12 +446,13 @@ Game.prototype.getSettings = function(fn) {
 
 Game.prototype.onSuccess = function(id) {
   this.controls.setStatus(id, "success");
+  this.eventQueue.queueNextEvent();
 };
 
 Game.prototype.onCancel = function(id) {
-  this.videoController.cancel();
-  this.videoController.loop();
   this.controls.setStatus(id, "danger");
+  this.videoController.restart();
+  this.eventQueue.restart();
 };
 
 Game.prototype.onFinished = function() {
