@@ -108,8 +108,10 @@ Button.prototype.makeElement = function() {
       + self.text
       );
 
-  $btn.mousedown(function() { self.notifyListeners("press"); });
-  $btn.mouseup(function() { self.notifyListeners("release"); });
+  $btn.on("mousedown", function() { self.notifyListeners("press"); });
+  $btn.on("mouseup", function() { self.notifyListeners("release"); });
+  $btn.on("touchstart", function() { self.notifyListeners("press"); });
+  $btn.on("touchend", function() { self.notifyListeners("release"); });
 
   return $btn;
 };
@@ -265,7 +267,7 @@ EventQueue.prototype.handleEvent = function(id) {
   console.log("EventQueue::handleEvent", this.index);
   var t = getTimestamp() - this.startTime;
   var currentEvent = this.events[this.index];
-  if (Math.abs(currentEvent.time - t) < this.allowedError) {
+  if (Math.abs(currentEvent.time - t) < this.allowedError * 1000) {
     this.success(id);
   } else {
     this.cancel(id);
@@ -365,8 +367,7 @@ Game.prototype.load = function(fn) {
   this.getSettings(function(settings) {
     self.controls.configure(settings.buttonDefinitions, settings.baseId);
 
-    var allowedError = 1000; // TODO
-    self.eventQueue.configure(allowedError);
+    self.eventQueue.configure(settings.allowedError);
     self.eventQueue.setEvents(settings.events);
 
     // load the video
@@ -424,12 +425,17 @@ $(function() {
   var $step1 = $("#step1");
   var $step2 = $("#step2");
   var $step3 = $("#step3");
+  var $loadingStep = $("#loadingStep");
 
   // disable right click on video
   var $video = $("#video");
   $video.on("contextmenu", function(e) {
     return false;
   });
+
+  // disable focus on buttons (Bootstrap)
+  $(".btn").on("mouseup", function(){ $(this).blur(); });
+  $(".btn").on("touchend", function(){ $(this).blur(); });
 
   var game = new Game($video, $(window));
 
@@ -454,7 +460,10 @@ $(function() {
   $button.click(function() {
     $button.hide();
 
+    $loadingStep.show();
     game.load(function() {
+      $loadingStep.hide();
+
       // show and start the countdown
       $counterDown.fadeIn();
       $counterDown.counter("start");
