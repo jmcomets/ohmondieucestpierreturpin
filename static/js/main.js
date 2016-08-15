@@ -114,14 +114,8 @@ Button.prototype.makeElement = function() {
   return $btn;
 };
 
-var Controls = function(buttonDefinitions, baseId) {
-  this.baseId = baseId;
-  this.buttonDefinitions = buttonDefinitions;
-
+var Controls = function() {
   this.listeners = [];
-
-  this.buttons = this.makeButtons();
-  this.$e = this.makeElement();
 };
 
 Controls.prototype.makeButtons = function() {
@@ -142,6 +136,13 @@ Controls.prototype.makeButtons = function() {
   }
 
   return buttons;
+};
+
+Controls.prototype.configure = function(buttonDefinitions, baseId) {
+  this.baseId = baseId;
+  this.buttonDefinitions = buttonDefinitions;
+  this.buttons = this.makeButtons();
+  this.$e = this.makeElement();
 };
 
 Controls.prototype.makeElement = function() {
@@ -202,13 +203,15 @@ Controls.prototype.getKeyIds = function() {
   return keyIds;
 };
 
-var VideoController = function(video, startTime, endTime) {
+var VideoController = function() {
+  this.endTimeoutId = -1;
+};
+
+VideoController.prototype.configure = function(video, startTime, endTime) {
   this.video = video;
 
   this.startTime = startTime;
   this.endTime = endTime;
-
-  this.endTimeoutId = -1;
 };
 
 VideoController.prototype.start = function() {
@@ -238,13 +241,19 @@ function getTimestamp() {
   return new Date().getTime();
 }
 
-var EventQueue = function(events) {
+var EventQueue = function() {
   this.index = -1;
-  this.events = events;
   this.timeoutId = -1;
   this.listeners = {cancel: [], success: [], finished: []};
   this.startTime = 0;
-  this.allowedError = 1000;
+};
+
+EventQueue.prototype.configure = function(allowedError) {
+  this.allowedError = allowedError;
+};
+
+EventQueue.prototype.setEvents = function(events) {
+  this.events = events;
 };
 
 EventQueue.prototype.start = function() {
@@ -322,25 +331,70 @@ EventQueue.prototype.onCancel = function(fn) {
   this.listeners.cancel.push(fn);
 };
 
-var Game = function(settings, videoElement, eventElement) {
-    this.videoController = new VideoController(videoElement, settings.startTime, settings.endTime);
-    this.controls = new Controls(settings.buttonDefinitions, settings.baseId);
-    this.shortcuts = new Shortcuts();
-    this.eventQueue = new EventQueue(settings.events);
+var Game = function($videoElement, $eventElement) {
+  this.$videoElement = $videoElement;
 
-    var self = this;
+  this.videoController = new VideoController();
+  this.controls = new Controls();
+  this.shortcuts = new Shortcuts();
+  this.eventQueue = new EventQueue();
 
-    this.shortcuts.onPress(function(code)   { self.controls.hit(code, "press"); });
-    this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
-    this.shortcuts.bindTo($(eventElement));
+  var self = this;
 
-    this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
+  this.shortcuts.onPress(function(code)   { self.controls.hit(code, "press"); });
+  this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
+  this.shortcuts.bindTo($eventElement);
 
-    // event queue events
-    this.eventQueue.onSuccess(function(id) { self.onSuccess(id); });
-    this.eventQueue.onFinished(function() { self.onFinished(); });
-    this.eventQueue.onCancel(function(id) { self.onCancel(id); });
+  this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
+
+  // event queue events
+  this.eventQueue.onSuccess(function(id) { self.onSuccess(id); });
+  this.eventQueue.onFinished(function() { self.onFinished(); });
+  this.eventQueue.onCancel(function(id) { self.onCancel(id); });
 };
+
+Game.prototype.start = function($controlsElement) {
+  this.shortcuts.accept(this.controls.getKeyIds());
+  this.controls.appendTo($controlsElement);
+  this.videoController.start();
+  this.eventQueue.start();
+};
+
+Game.prototype.load = function(fn) {
+  var self = this;
+  this.getSettings(function(settings) {
+    self.controls.configure(settings.buttonDefinitions, settings.baseId);
+
+    var allowedError = 1000; // TODO
+    self.eventQueue.configure(allowedError);
+    self.eventQueue.setEvents(settings.events);
+
+    // load the video
+    self.loadVideo(settings.src, settings.startTime, settings.endTime, fn);
+  });
+};
+
+Game.prototype.loadVideo = function(src, startTime, endTime, fn) {
+  var self = this;
+  console.log(src);
+  self.$videoElement.find("source").first().attr("src", src);
+  var video = self.$videoElement.get(0);
+  video.oncanplay = function() {
+    self.videoController.configure(video, startTime, endTime);
+    video.oncanplay = null;
+
+    // all is loaded
+    fn();
+  };
+  video.load();
+};
+
+Game.prototype.getSettings = function(fn) {
+  $.getJSON('/static/settings.json', function(settings) {
+    //console.log(settings);
+    fn(settings);
+  });
+}
 
 Game.prototype.onSuccess = function(id) {
   console.log("Game::onSuccess");
@@ -362,20 +416,6 @@ Game.prototype.onFinished = function() {
   // TODO
 };
 
-Game.prototype.start = function($controlsElement) {
-  this.shortcuts.accept(this.controls.getKeyIds());
-  this.controls.appendTo($controlsElement);
-  this.videoController.start();
-  this.eventQueue.start();
-};
-
-function getSettings(fn) {
-  $.getJSON('/static/video.json', function(settings) {
-    console.log(settings);
-    fn(settings);
-  });
-}
-
 $(function() {
   // dom objects
   var $controls = $("#controls");
@@ -391,31 +431,30 @@ $(function() {
     return false;
   });
 
-  getSettings(function(settings) {
-    var game = new Game(settings, $video.get(0), window);
+  var game = new Game($video, $(window));
 
-    // TODO: move to settings.json
-    // var countDownDuration = 3000;
-    // var flashDuration = 3;
-    var countDownDuration = 0.5;
-    var flashDuration = 0.5;
+  // TODO: move to settings.json
+  // var countDownDuration = 3000;
+  // var flashDuration = 3;
+  var countDownDuration = 0.5;
+  var flashDuration = 0.5;
 
-    var $counterDown = $("#counter-down");
+  var $counterDown = $("#counter-down");
 
-    $counterDown.text(countDownDuration * 1000);
+  $counterDown.text(countDownDuration * 1000);
 
-    $counterDown.counter({
-      autoStart: false,
-      countTo: 0,
-      duration: countDownDuration * 1000,
-      easing: "easeOutCubic"
-    });
+  $counterDown.counter({
+    autoStart: false,
+    countTo: 0,
+    duration: countDownDuration * 1000,
+    easing: "easeOutCubic"
+  });
 
-    // kick off
-    var $button = $("#trigger");
-    $button.click(function() {
-      $button.hide();
+  var $button = $("#trigger");
+  $button.click(function() {
+    $button.hide();
 
+    game.load(function() {
       // show and start the countdown
       $counterDown.fadeIn();
       $counterDown.counter("start");
@@ -437,4 +476,5 @@ $(function() {
       }, countDownDuration);
     });
   });
+
 });
