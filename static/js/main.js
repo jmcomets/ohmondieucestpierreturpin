@@ -110,34 +110,14 @@ Button.prototype.makeElement = function() {
 
   $btn.on("mousedown", function() { self.notifyListeners("press"); });
   $btn.on("mouseup", function() { self.notifyListeners("release"); });
-  $btn.on("touchstart", function() { self.notifyListeners("press"); });
-  $btn.on("touchend", function() { self.notifyListeners("release"); });
+  // $btn.on("touchstart", function() { self.notifyListeners("press"); });
+  // $btn.on("touchend", function() { self.notifyListeners("release"); });
 
   return $btn;
 };
 
 var Controls = function() {
   this.listeners = [];
-};
-
-Controls.prototype.makeButtons = function() {
-  var self = this;
-
-  var buttons = {};
-  for (var id in self.buttonDefinitions) {
-    id = parseInt(id);
-
-    var btn = new Button(id, self.buttonDefinitions[id]);
-
-    // JS = caca
-    btn.onHit(function(id, type) {
-      self.hit(self.baseId + id);
-    });
-
-    buttons[id] = btn;
-  }
-
-  return buttons;
 };
 
 Controls.prototype.configure = function(buttonDefinitions, baseId) {
@@ -154,6 +134,26 @@ Controls.prototype.makeElement = function() {
     this.buttons[id].appendTo($e);
   }
   return $e;
+};
+
+Controls.prototype.makeButtons = function() {
+  var self = this;
+
+  var buttons = {};
+  for (var id in self.buttonDefinitions) {
+    id = parseInt(id);
+
+    var btn = new Button(id, self.buttonDefinitions[id]);
+
+    // JS = caca
+    btn.onHit(function(id, type) {
+      self.hit(self.baseId + id, type);
+    });
+
+    buttons[id] = btn;
+  }
+
+  return buttons;
 };
 
 Controls.prototype.appendTo = function($container) {
@@ -175,8 +175,8 @@ Controls.prototype.setStatus = function(id, statusCode) {
 };
 
 Controls.prototype.hit = function(code, type) {
-  console.log("Controls::hit");
   var id = code - this.baseId;
+  console.log("Controls::hit", id);
 
   // clear the status when releasing the key
   if (type == "press") {
@@ -245,13 +245,14 @@ function getTimestamp() {
 
 var EventQueue = function() {
   this.index = -1;
-  this.timeoutId = -1;
+  this.cancelTimeoutId = -1;
   this.listeners = {cancel: [], success: [], finished: []};
   this.startTime = 0;
 };
 
 EventQueue.prototype.configure = function(allowedError) {
   this.allowedError = allowedError;
+  this.allowedError *= 1000; // in ms
 };
 
 EventQueue.prototype.setEvents = function(events) {
@@ -265,25 +266,32 @@ EventQueue.prototype.start = function() {
 
 EventQueue.prototype.handleEvent = function(id) {
   console.log("EventQueue::handleEvent", this.index);
-  var t = getTimestamp() - this.startTime;
+  var t = this.getRelativeTime();
   var currentEvent = this.events[this.index];
-  if (Math.abs(currentEvent.time - t) < this.allowedError * 1000) {
+  if (Math.abs(t - currentEvent.time) < this.allowedError) {
     this.success(id);
   } else {
     this.cancel(id);
   }
 };
 
+EventQueue.prototype.getRelativeTime = function() {
+  return getTimestamp() - this.startTime;
+};
+
 EventQueue.prototype.queueNextEvent = function() {
   console.log("EventQueue::queueNextEvent");
   this.index++;
   if (this.index < this.events.length) {
+    // compute time til next event
     var currentEvent = this.events[this.index];
-    var currentTime = getTimestamp() - this.startTime;
+    var currentTime = this.getRelativeTime();
     var t = currentEvent.time - currentTime;
+
     if (t > 0) {
       var self = this;
-      this.timeoutId = setTimeout(function() { self.cancel(currentEvent.id); }, t);
+      this.cancelTimeoutId = setTimeout(function() { self.cancel(currentEvent.id); },
+                                  t + this.allowedError);
     } else {
       console.error("could not set timeout, negative time");
     }
@@ -291,9 +299,9 @@ EventQueue.prototype.queueNextEvent = function() {
 };
 
 EventQueue.prototype.success = function(id) {
-    if (this.timeoutId != -1) {
-      clearTimeout(this.timeoutId);
-      this.timeoutId = -1;
+    if (this.cancelTimeoutId != -1) {
+      clearTimeout(this.cancelTimeoutId);
+      this.cancelTimeoutId = -1;
 
       this.queueNextEvent();
 
