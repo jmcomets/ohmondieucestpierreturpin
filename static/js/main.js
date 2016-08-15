@@ -176,7 +176,6 @@ Controls.prototype.setStatus = function(id, statusCode) {
 
 Controls.prototype.hit = function(code, type) {
   var id = code - this.baseId;
-  console.log("Controls::hit", id);
 
   // clear the status when releasing the key
   if (type == "press") {
@@ -265,7 +264,6 @@ EventQueue.prototype.start = function() {
 };
 
 EventQueue.prototype.handleEvent = function(id) {
-  console.log("EventQueue::handleEvent", this.index);
   var t = this.getRelativeTime();
   var currentEvent = this.events[this.index];
   if (Math.abs(t - currentEvent.time) < this.allowedError) {
@@ -280,7 +278,6 @@ EventQueue.prototype.getRelativeTime = function() {
 };
 
 EventQueue.prototype.queueNextEvent = function() {
-  console.log("EventQueue::queueNextEvent");
   this.index++;
   if (this.index < this.events.length) {
     // compute time til next event
@@ -385,7 +382,6 @@ Game.prototype.load = function(fn) {
 
 Game.prototype.loadVideo = function(src, startTime, endTime, fn) {
   var self = this;
-  console.log(src);
   self.$videoElement.find("source").first().attr("src", src);
   var video = self.$videoElement.get(0);
   video.oncanplay = function() {
@@ -400,25 +396,21 @@ Game.prototype.loadVideo = function(src, startTime, endTime, fn) {
 
 Game.prototype.getSettings = function(fn) {
   $.getJSON('/static/settings.json', function(settings) {
-    //console.log(settings);
     fn(settings);
   });
 }
 
 Game.prototype.onSuccess = function(id) {
-  console.log("Game::onSuccess");
   this.controls.setStatus(id, "success");
 };
 
 Game.prototype.onCancel = function(id) {
-  console.log("Game::onCancel");
   this.videoController.cancel();
   this.videoController.loop();
   this.controls.setStatus(id, "danger");
 };
 
 Game.prototype.onFinished = function() {
-  console.log("Game::onFinished");
   this.shortcuts.disable();
   this.videoController.cancel();
 
