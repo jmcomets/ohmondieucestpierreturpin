@@ -215,7 +215,6 @@ VideoController.prototype.configure = function(video, startTime, endTime) {
 };
 
 VideoController.prototype.start = function() {
-  console.log("starting video", this.startTime, this.endTime);
   this.video.play();
   this.loop();
 };
@@ -297,7 +296,7 @@ EventQueue.prototype.queueNextEvent = function() {
 
     if (t > 0) {
       var self = this;
-      console.log("will cancel in " + (t / 1000) + " seconds");
+      //console.log("will cancel in " + (t / 1000) + " seconds");
       this.cancelTimeoutId = setTimeout(function() { self.cancel(currentEvent.id); }, t);
     } else {
       console.error("could not set timeout, negative time");
@@ -378,12 +377,47 @@ KeyLogger.prototype.handleEvent = function(id) {
   this.events.push({time: t, id: id});
 };
 
-var ScoreBoard = function() {
+var ScoreBoard = function($highScoreElement, $averageScoreElement, $mostFailedElement) {
+  this.$highScoreElement = $highScoreElement;
+  this.$averageScoreElement = $averageScoreElement;
+  this.$mostFailedElement = $mostFailedElement;
+
   this.score = 0;
+  this.highScore = -1;
+  this.mostFailed = -1;
+  this.averageScore = -1;
+
+  this.pollTimeoutId = -1;
 };
 
-ScoreBoard.prototype.configure = function(scoring) {
+ScoreBoard.prototype.configure = function(buttonDefinitions, scoring, pollRate) {
+  this.buttonDefinitions = buttonDefinitions;
   this.scoring = scoring;
+  this.pollRate = pollRate;
+};
+
+ScoreBoard.prototype.startPolling = function() {
+  var self = this;
+
+  var poll = function() {
+    self.load(function() {
+      self.render();
+      self.pollTimeoutId = setTimeout(poll, self.pollRate * 1000);
+    });
+  };
+
+  poll();
+};
+
+ScoreBoard.prototype.load = function(fn) {
+  var self = this;
+  $.getJSON("/score", function(scores) {
+    self.highScore = scores["top_scores"][0];
+    self.mostFailed = scores["most_failed"][0];
+    self.averageScore = scores["average_score"];
+
+    fn();
+  });
 };
 
 ScoreBoard.prototype.success = function(id) {
@@ -395,13 +429,44 @@ ScoreBoard.prototype.success = function(id) {
 };
 
 ScoreBoard.prototype.cancel = function(id) {
+  var scoreForThisId = this.scoring[id];
   postData("/score", {"score": this.score, "failed_at": id});
+  this.score = 0;
 };
 
 ScoreBoard.prototype.render = function() {
+  // most failed
+  var mostFailed = this.buttonDefinitions[this.mostFailed];
+  if (mostFailed !== undefined) {
+    this.$mostFailedElement.text(mostFailed);
+  }
+
+  // high score
+  var beatingHighScore = this.score > this.highScore;
+  var highScore = beatingHighScore ? this.score : this.highScore;
+  this.$highScoreElement.attr("class", "label");
+  if (beatingHighScore) {
+    this.$highScoreElement.addClass("label-success");
+  } else {
+    this.$highScoreElement.addClass("label-default");
+  }
+  this.$highScoreElement.text(highScore);
+
+  // average score
+  var overAverageScore = this.score > this.averageScore;
+  this.$averageScoreElement.attr("class", "label");
+  if (overAverageScore) {
+    this.$averageScoreElement.addClass("label-warning");
+  } else {
+    this.$averageScoreElement.addClass("label-default");
+  }
+  this.$averageScoreElement.text(this.averageScore);
 };
 
-var Game = function($videoElement, $eventElement) {
+var Game = function($videoElement, $eventElement,
+                    $highScoreElement,
+                    $averageScoreElement,
+                    $mostFailedElement) {
   this.$videoElement = $videoElement;
 
   this.videoController = new VideoController();
@@ -426,7 +491,7 @@ var Game = function($videoElement, $eventElement) {
   this.eventQueue.onFinished(function() { self.onFinished(); });
   this.eventQueue.onCancel(function(id) { self.onCancel(id); });
 
-  this.scoreBoard = new ScoreBoard();
+  this.scoreBoard = new ScoreBoard($highScoreElement, $averageScoreElement, $mostFailedElement);
 };
 
 Game.prototype.start = function($controlsElement) {
@@ -434,6 +499,7 @@ Game.prototype.start = function($controlsElement) {
   this.controls.appendTo($controlsElement);
   this.videoController.start();
   //this.keyLogger.start();
+  this.scoreBoard.startPolling();
   this.eventQueue.start();
 };
 
@@ -445,7 +511,7 @@ Game.prototype.load = function(fn) {
     self.eventQueue.configure(settings.allowedError);
     self.eventQueue.setEvents(settings.events);
 
-    self.scoreBoard.configure(settings.scoring);
+    self.scoreBoard.configure(settings.buttonDefinitions, settings.scoring, settings.pollRate);
 
     // load the video
     self.loadVideo(settings.src, settings.startTime, settings.endTime, fn);
@@ -512,7 +578,7 @@ $(function() {
   $(".btn").on("mouseup", function(){ $(this).blur(); });
   $(".btn").on("touchend", function(){ $(this).blur(); });
 
-  var game = new Game($video, $(window));
+  var game = new Game($video, $(window), $("#high-score"), $("#average-score"), $("#most-failed"));
 
   // TODO: move to settings.json
   // var countDownDuration = 3000;

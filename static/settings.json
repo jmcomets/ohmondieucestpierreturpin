@@ -2,6 +2,7 @@
     "src": "/static/video.mp4",
     "startTime": 3.3,
     "endTime": 102.2,
+    "pollRate": 5,
     "allowedError": 1,
     "baseId": 48,
     "buttonDefinitions": {
