@@ -11,16 +11,17 @@
   </head>
   <body>
     <div class="container">
-      <div class="push"></div>
       <div class="row">
         <button id="debug" style="display:none" class="btn btn-default btn-lg" type="button">Debug</button>
       </div>
       <div id="loadingStep" class="row" style="display:none">
+        <div class="push"></div>
         <div class="col-md-6 col-md-offset-3 text-center">
           <img src="/static/img/loading.svg" style="width:66%" alt="Loading..."/>
         </div>
       </div>
       <div id="step1" class="row">
+        <div class="push"></div>
         <div class="col-md-12 text-center">
           <button id="trigger" type="button" class="btn btn-primary btn-xl">
             <span class="glyphicon glyphicon-play"></span>
@@ -29,6 +30,7 @@
         </div>
       </div>
       <div id="step2" class="row" style="display:none">
+        <div class="push"></div>
         <div class="col-md-12 text-center">
           <h1>Follow along!</h1>
         </div>
@@ -36,13 +38,13 @@
       <div id="step3" style="display:none">
         <div class="row">
           <div class="col-md-3">
-            <h3 class="text-center">Best: <small id="high-score"></small></h3>
+            <h4 class="text-left">Best: <small id="high-score"></small></h4>
           </div>
           <div class="col-md-3">
-            <h3 class="text-center">Average: <small id="average-score"></small></h3>
+            <h4 class="text-left">Average: <small id="average-score"></small></h4>
           </div>
           <div class="col-md-6">
-            <h3 class="text-center">Most failed: <small id="most-failed"></small></h3>
+            <h4 class="text-left">Most failed: <small id="most-failed"></small></h4>
           </div>
         </div>
         <div class="row">
