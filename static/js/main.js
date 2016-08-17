@@ -378,10 +378,8 @@ function postData(url, data, success) {
   });
 }
 
-var ScoreBoard = function($highScoreElement, $averageScoreElement, $mostFailedElement) {
-  this.$highScoreElement = $highScoreElement;
-  this.$averageScoreElement = $averageScoreElement;
-  this.$mostFailedElement = $mostFailedElement;
+var ScoreBoard = function($elements) {
+  this.$elements = $elements;
 
   this.score = 0;
   this.highScore = -1;
@@ -450,42 +448,47 @@ ScoreBoard.prototype.render = function() {
   // most failed
   var mostFailed = this.buttonDefinitions[this.mostFailed];
   if (mostFailed !== undefined) {
-    this.$mostFailedElement.text(mostFailed);
+    this.$elements.mostFailed.text(mostFailed);
   }
 
   // high score
   var beatingHighScore = this.score > this.highScore;
   var highScore = beatingHighScore ? this.score : this.highScore;
-  this.$highScoreElement.attr("class", "label");
+  this.$elements.highScore.attr("class", "label label-as-badge");
   if (beatingHighScore) {
-    this.$highScoreElement.addClass("label-success");
+    this.$elements.highScore.addClass("label-success");
   } else {
-    this.$highScoreElement.addClass("label-default");
+    this.$elements.highScore.addClass("label-default");
   }
-  this.$highScoreElement.text(highScore);
+  this.$elements.highScore.text(highScore);
 
   // average score
   var overAverageScore = this.score > this.averageScore;
-  this.$averageScoreElement.attr("class", "label");
+  this.$elements.averageScore.attr("class", "label label-as-badge");
   if (overAverageScore) {
-    this.$averageScoreElement.addClass("label-warning");
+    this.$elements.averageScore.addClass("label-warning");
   } else {
-    this.$averageScoreElement.addClass("label-default");
+    this.$elements.averageScore.addClass("label-default");
   }
-  this.$averageScoreElement.text(this.averageScore);
+  this.$elements.averageScore.text(this.averageScore);
+
+  // current score
+  this.$elements.currentScore.attr("class", "label label-as-badge");
+  this.$elements.currentScore.text(this.score);
+
+  // current combo
+  this.$elements.currentCombo.attr("class", "label label-as-badge");
+  this.$elements.currentCombo.text(this.comboFactor);
 };
 
-var Game = function($videoElement, $eventElement,
-                    $highScoreElement,
-                    $averageScoreElement,
-                    $mostFailedElement) {
+var Game = function($videoElement, $eventElement, scoreBoardElements) {
   this.$videoElement = $videoElement;
 
   this.videoController = new VideoController();
   this.controls = new Controls();
   this.shortcuts = new Shortcuts();
   this.eventQueue = new EventQueue();
-  this.scoreBoard = new ScoreBoard($highScoreElement, $averageScoreElement, $mostFailedElement);
+  this.scoreBoard = new ScoreBoard(scoreBoardElements);
 
   var self = this;
 
@@ -584,7 +587,13 @@ $(function() {
   $(".btn").on("mouseup", function(){ $(this).blur(); });
   $(".btn").on("touchend", function(){ $(this).blur(); });
 
-  var game = new Game($video, $(window), $("#high-score"), $("#average-score"), $("#most-failed"));
+  var game = new Game($video, $(window), {
+    currentScore: $("#current-score"),
+    currentCombo: $("#current-combo"),
+    highScore: $("#high-score"),
+    averageScore: $("#average-score"),
+    mostFailed: $("#most-failed")
+  });
 
   // TODO: move to settings.json
   // var countDownDuration = 3000;
