@@ -125,44 +125,13 @@ Controls.prototype.configure = function(buttonDefinitions, baseId) {
   this.buttonDefinitions = buttonDefinitions;
   this.buttons = this.makeButtons();
   this.$e = this.makeElement();
-};
-
-Controls.prototype.makeElement = function() {
-  var $e = $("<div></div>");
-  $e.addClass("btn-group-vertical");
-  for (var id in this.buttons) {
-    this.buttons[id].appendTo($e);
-  }
-  return $e;
-};
-
-Controls.prototype.makeButtons = function() {
-  var self = this;
-
-  var buttons = {};
-  for (var id in self.buttonDefinitions) {
-    id = parseInt(id);
-
-    var btn = new Button(id, self.buttonDefinitions[id]);
-
-    // JS = caca
-    btn.onHit(function(id, type) {
-      self.hit(self.baseId + id, type);
-    });
-
-    buttons[id] = btn;
-  }
-
-  return buttons;
-};
-
-Controls.prototype.appendTo = function($container) {
-  this.$e.appendTo($container);
+  this.temporaryStatusTimeoutIds = {};
 };
 
 Controls.prototype.clearStatus = function(id) {
   var btn = this.buttons[id];
   if (btn) {
+    this.clearTemporaryStatus(id);
     btn.clearStatus();
   }
 };
@@ -170,8 +139,28 @@ Controls.prototype.clearStatus = function(id) {
 Controls.prototype.setStatus = function(id, statusCode) {
   var btn = this.buttons[id];
   if (btn) {
+    this.clearTemporaryStatus(id);
     btn.setStatus(statusCode);
   }
+};
+
+Controls.prototype.clearTemporaryStatus = function(id) {
+  var timeoutId = this.temporaryStatusTimeoutIds[id];
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    this.temporaryStatusTimeoutIds[id] = undefined;
+  }
+};
+
+Controls.prototype.setTemporaryStatus = function(id, statusCode) {
+  this.setStatus(id, statusCode);
+
+  var duration = 2; // TODO: settings
+
+  var self = this;
+  this.temporaryStatusTimeoutIds[id] = setTimeout(function() {
+    self.clearStatus(id);
+  }, duration * 1000);
 };
 
 Controls.prototype.hit = function(code, type) {
@@ -204,8 +193,42 @@ Controls.prototype.getKeyIds = function() {
   return keyIds;
 };
 
+Controls.prototype.makeButtons = function() {
+  var self = this;
+
+  var buttons = {};
+  for (var id in self.buttonDefinitions) {
+    id = parseInt(id);
+
+    var btn = new Button(id, self.buttonDefinitions[id]);
+
+    // JS = caca
+    btn.onHit(function(id, type) {
+      self.hit(self.baseId + id, type);
+    });
+
+    buttons[id] = btn;
+  }
+
+  return buttons;
+};
+
+Controls.prototype.makeElement = function() {
+  var $e = $("<div></div>");
+  $e.addClass("btn-group-vertical");
+  for (var id in this.buttons) {
+    this.buttons[id].appendTo($e);
+  }
+  return $e;
+};
+
+Controls.prototype.appendTo = function($container) {
+  this.$e.appendTo($container);
+};
+
 var VideoController = function() {
   this.endTimeoutId = -1;
+  this.endListeners = [];
 };
 
 VideoController.prototype.configure = function(video, startTime, endTime) {
@@ -216,18 +239,23 @@ VideoController.prototype.configure = function(video, startTime, endTime) {
 
 VideoController.prototype.start = function() {
   this.video.play();
-  this.loop();
+  this.video.currentTime = this.startTime;
+
+  // set timeout to notify end listeners
+  var self = this;
+  self.endTimeoutId = setTimeout(function() {
+    self.notifyEnd();
+  }, (self.endTime - self.startTime) * 1000);
 };
 
-VideoController.prototype.loop = function() {
-  var self = this;
+VideoController.prototype.notifyEnd = function(fn) {
+  for (var i = 0; i < self.endListeners.length; i++) {
+    self.endListeners[i]();
+  }
+};
 
-  var loopFn = function() {
-    self.video.currentTime = self.startTime;
-    self.endTimeoutId = setTimeout(loopFn, (self.endTime - self.startTime) * 1000);
-  };
-
-  loopFn();
+VideoController.prototype.onEnd = function(fn) {
+  this.endListeners.push(fn);
 };
 
 VideoController.prototype.restart = function() {
@@ -235,7 +263,7 @@ VideoController.prototype.restart = function() {
     clearTimeout(this.endTimeoutId);
     this.endTimeoutId = -1;
   }
-  this.loop();
+  this.start();
 };
 
 function getTimestamp() {
@@ -275,7 +303,7 @@ EventQueue.prototype.restart = function() {
 EventQueue.prototype.handleEvent = function(id) {
   var t = this.getRelativeTime();
   var currentEvent = this.events[this.index];
-  if (id == currentEvent.id && Math.abs(t - currentEvent.time) <= this.allowedError) {
+  if (currentEvent && id == currentEvent.id && Math.abs(t - currentEvent.time) <= this.allowedError) {
     this.success(id);
   } else {
     this.cancel(id);
@@ -480,16 +508,16 @@ var Game = function($videoElement, $eventElement,
   this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
   this.shortcuts.bindTo($eventElement);
 
-  this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
-
   //this.keyLogger = new KeyLogger();
   //this.controls.onHit(function(id) { self.keyLogger.handleEvent(id); });
   //this.controls.onHit(function(id) { self.controls.setStatus(id, "warning"); });
 
-  // event queue events
+  this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
   this.eventQueue.onSuccess(function(id) { self.onSuccess(id); });
   this.eventQueue.onFinished(function() { self.onFinished(); });
   this.eventQueue.onCancel(function(id) { self.onCancel(id); });
+
+  this.videoController.onEnd(function() { self.restart(); });
 
   this.scoreBoard = new ScoreBoard($highScoreElement, $averageScoreElement, $mostFailedElement);
 };
@@ -546,7 +574,11 @@ Game.prototype.onSuccess = function(id) {
 
 Game.prototype.onCancel = function(id) {
   this.scoreBoard.cancel(id);
-  this.controls.setStatus(id, "danger");
+  this.controls.setTemporaryStatus(id, "danger");
+  this.restart();
+};
+
+Game.prototype.restart = function() {
   this.videoController.restart();
   this.eventQueue.restart();
 };
