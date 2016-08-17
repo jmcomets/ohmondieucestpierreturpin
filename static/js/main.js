@@ -435,6 +435,7 @@ ScoreBoard.prototype.cancel = function(id) {
   postData("/score", {"final_score": this.score, "failed_at": id});
   this.score = 0;
   this.comboFactor = 1;
+  this.render();
 };
 
 ScoreBoard.prototype.increaseCombo = function() {
@@ -585,7 +586,7 @@ $(function() {
 
   // disable focus on buttons (Bootstrap)
   $(".btn").on("mouseup", function(){ $(this).blur(); });
-  $(".btn").on("touchend", function(){ $(this).blur(); });
+  //$(".btn").on("touchend", function(){ $(this).blur(); });
 
   var game = new Game($video, $(window), {
     currentScore: $("#current-score"),
