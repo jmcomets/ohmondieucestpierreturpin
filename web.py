@@ -1,55 +1,38 @@
-from flask import Flask, request, g, jsonify
-from collections import Counter
 import json
+from flask import Flask, request, g, jsonify, abort
+from score import get_score_stats, add_score
 
 app = Flask('ohmondieucestpierreturpin')
+
+with open('settings.json') as fp:
+    app.config['SETTINGS'] = json.load(fp)
 
 @app.route('/')
 def index():
     return app.send_static_file('index.html')
 
-DATABASE = 'database.json'
-
-def load_db():
-    try:
-        with open(DATABASE, 'r') as fp:
-            return json.load(fp)
-    except IOError:
-        return {}
-
-def save_db(db):
-    if db:
-        with open(DATABASE, 'w') as fp:
-            json.dump(db, fp)
-
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = load_db()
-    return db
+@app.route('/settings')
+def get_settings():
+    return jsonify(app.config['SETTINGS'])
 
 @app.route('/score', methods=['GET'])
 def get_score():
-    db_scores = get_db()['scores']
-    scores = sorted(list(map(lambda x: x['score'], db_scores)))
-    failed = Counter(map(lambda x: x['failed_at'], db_scores))
-    top_scores = sorted(list(set(scores[-5:])), reverse=True)
-    avg_score = int(sum(scores) / len(scores)) if scores else -1
-    most_failed = list(map(lambda x: x[0], sorted(failed.most_common(5), key=lambda x: x[1], reverse=True)))
-    return jsonify({
-        'top_scores': top_scores,
-        'average_score': avg_score,
-        'most_failed': most_failed
-        })
+    return jsonify(get_score_stats())
 
 @app.route('/score', methods=['POST'])
 def post_score():
     data = request.get_json()
-    db = get_db()
-    db.setdefault('scores', [])
-    db['scores'].append(data)
-    save_db(db)
-    return ''
+    try:
+        final_score = int(data['final_score'])
+        failed_at = int(data['failed_at'])
+    except KeyError:
+        return abort(400)
+    try:
+        add_score(final_score, failed_at)
+    except ValueError:
+        return abort(400)
+    else:
+        return ''
 
 # TODO: remove
 @app.route('/debug', methods=['POST'])

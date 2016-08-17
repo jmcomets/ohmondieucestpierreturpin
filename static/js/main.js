@@ -440,9 +440,9 @@ ScoreBoard.prototype.startPolling = function() {
 ScoreBoard.prototype.load = function(fn) {
   var self = this;
   $.getJSON("/score", function(scores) {
-    self.highScore = scores["top_scores"][0];
-    self.mostFailed = scores["most_failed"][0];
+    self.highScore = scores["high_score"]
     self.averageScore = scores["average_score"];
+    self.mostFailed = scores["most_failed"];
 
     fn();
   });
@@ -458,7 +458,7 @@ ScoreBoard.prototype.success = function(id) {
 
 ScoreBoard.prototype.cancel = function(id) {
   var scoreForThisId = this.scoring[id];
-  postData("/score", {"score": this.score, "failed_at": id});
+  postData("/score", {"final_score": this.score, "failed_at": id});
   this.score = 0;
 };
 
@@ -561,7 +561,7 @@ Game.prototype.loadVideo = function(src, startTime, endTime, fn) {
 };
 
 Game.prototype.getSettings = function(fn) {
-  $.getJSON('/static/settings.json', function(settings) {
+  $.getJSON('/settings', function(settings) {
     fn(settings);
   });
 }
