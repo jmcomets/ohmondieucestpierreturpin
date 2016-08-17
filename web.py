@@ -34,14 +34,6 @@ def post_score():
     else:
         return ''
 
-# TODO: remove
-@app.route('/debug', methods=['POST'])
-def debug():
-    data = request.get_json()
-    with open('data.json', 'w') as fp:
-        json.dump(data, fp)
-    return ''
-
 if __name__ == '__main__':
     import sys
     app.run(debug='--debug' in sys.argv)

@@ -273,7 +273,7 @@ function getTimestamp() {
 var EventQueue = function() {
   this.index = -1;
   this.cancelTimeoutId = -1;
-  this.listeners = {cancel: [], success: [], finished: []};
+  this.listeners = {cancel: [], success: []};
   this.startTime = 0;
 };
 
@@ -335,14 +335,12 @@ EventQueue.prototype.queueNextEvent = function() {
 };
 
 EventQueue.prototype.success = function(id) {
-    if (this.cancelTimeoutId != -1) {
-      clearTimeout(this.cancelTimeoutId);
-      this.cancelTimeoutId = -1;
+  if (this.cancelTimeoutId != -1) {
+    clearTimeout(this.cancelTimeoutId);
+    this.cancelTimeoutId = -1;
 
-      this.notifyListeners("success", id);
-    } else {
-      this.notifyListeners("finished");
-    }
+    this.notifyListeners("success", id);
+  }
 };
 
 EventQueue.prototype.cancel = function(id) {
@@ -359,10 +357,6 @@ EventQueue.prototype.notifyListeners = function(type) {
     var fn = listeners[i];
     fn.apply(fn, args)
   }
-};
-
-EventQueue.prototype.onFinished = function(fn) {
-  this.listeners.finished.push(fn);
 };
 
 EventQueue.prototype.onSuccess = function(fn) {
@@ -383,27 +377,6 @@ function postData(url, data, success) {
     success: success
   });
 }
-
-var KeyLogger = function() {
-  this.events = [];
-  this.startTime = -1;
-
-  var self = this;
-  $("#debug").click(function() {
-    console.log("dumping current events", self.events);
-    postData("/debug", {"event": self.events});
-    self.events = [];
-  });
-};
-
-KeyLogger.prototype.start = function() {
-  this.startTime = getTimestamp();
-};
-
-KeyLogger.prototype.handleEvent = function(id) {
-  var t = getTimestamp() - this.startTime;
-  this.events.push({time: t, id: id});
-};
 
 var ScoreBoard = function($highScoreElement, $averageScoreElement, $mostFailedElement) {
   this.$highScoreElement = $highScoreElement;
@@ -501,6 +474,7 @@ var Game = function($videoElement, $eventElement,
   this.controls = new Controls();
   this.shortcuts = new Shortcuts();
   this.eventQueue = new EventQueue();
+  this.scoreBoard = new ScoreBoard($highScoreElement, $averageScoreElement, $mostFailedElement);
 
   var self = this;
 
@@ -508,25 +482,17 @@ var Game = function($videoElement, $eventElement,
   this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
   this.shortcuts.bindTo($eventElement);
 
-  //this.keyLogger = new KeyLogger();
-  //this.controls.onHit(function(id) { self.keyLogger.handleEvent(id); });
-  //this.controls.onHit(function(id) { self.controls.setStatus(id, "warning"); });
+  this.videoController.onEnd(function() { self.restart(); });
 
   this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
   this.eventQueue.onSuccess(function(id) { self.onSuccess(id); });
-  this.eventQueue.onFinished(function() { self.onFinished(); });
   this.eventQueue.onCancel(function(id) { self.onCancel(id); });
-
-  this.videoController.onEnd(function() { self.restart(); });
-
-  this.scoreBoard = new ScoreBoard($highScoreElement, $averageScoreElement, $mostFailedElement);
 };
 
 Game.prototype.start = function($controlsElement) {
   this.shortcuts.accept(this.controls.getKeyIds());
   this.controls.appendTo($controlsElement);
   this.videoController.start();
-  //this.keyLogger.start();
   this.scoreBoard.startPolling();
   this.eventQueue.start();
 };
@@ -541,9 +507,25 @@ Game.prototype.load = function(fn) {
 
     self.scoreBoard.configure(settings.buttonDefinitions, settings.scoring, settings.pollRate);
 
-    // load the video
     self.loadVideo(settings.src, settings.startTime, settings.endTime, fn);
   });
+};
+
+Game.prototype.restart = function() {
+  this.videoController.restart();
+  this.eventQueue.restart();
+};
+
+Game.prototype.onSuccess = function(id) {
+  this.controls.setStatus(id, "success");
+  this.scoreBoard.success(id);
+  this.eventQueue.queueNextEvent();
+};
+
+Game.prototype.onCancel = function(id) {
+  this.controls.setTemporaryStatus(id, "danger");
+  this.scoreBoard.cancel(id);
+  this.restart();
 };
 
 Game.prototype.loadVideo = function(src, startTime, endTime, fn) {
@@ -565,30 +547,6 @@ Game.prototype.getSettings = function(fn) {
     fn(settings);
   });
 }
-
-Game.prototype.onSuccess = function(id) {
-  this.scoreBoard.success(id);
-  this.controls.setStatus(id, "success");
-  this.eventQueue.queueNextEvent();
-};
-
-Game.prototype.onCancel = function(id) {
-  this.scoreBoard.cancel(id);
-  this.controls.setTemporaryStatus(id, "danger");
-  this.restart();
-};
-
-Game.prototype.restart = function() {
-  this.videoController.restart();
-  this.eventQueue.restart();
-};
-
-Game.prototype.onFinished = function() {
-  this.shortcuts.disable();
-  this.videoController.cancel();
-
-  // TODO
-};
 
 $(function() {
   // dom objects
