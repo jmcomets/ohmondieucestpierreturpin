@@ -389,6 +389,9 @@ var ScoreBoard = function($highScoreElement, $averageScoreElement, $mostFailedEl
   this.averageScore = -1;
 
   this.pollTimeoutId = -1;
+
+  this.comboFactor = 1;
+  this.maxComboFactor = 8;
 };
 
 ScoreBoard.prototype.configure = function(buttonDefinitions, scoring, pollRate) {
@@ -413,9 +416,9 @@ ScoreBoard.prototype.startPolling = function() {
 ScoreBoard.prototype.load = function(fn) {
   var self = this;
   $.getJSON("/score", function(scores) {
-    self.highScore = scores["high_score"]
-    self.averageScore = scores["average_score"];
-    self.mostFailed = scores["most_failed"];
+    self.highScore = Math.floor(scores["high_score"]);
+    self.averageScore = Math.floor(scores["average_score"]);
+    self.mostFailed = Math.floor(scores["most_failed"]);
 
     fn();
   });
@@ -424,7 +427,7 @@ ScoreBoard.prototype.load = function(fn) {
 ScoreBoard.prototype.success = function(id) {
   var scoreForThisId = this.scoring[id];
   if (scoreForThisId) {
-    this.score += scoreForThisId;
+    this.score += scoreForThisId * this.comboFactor;
     this.render();
   }
 };
@@ -433,6 +436,14 @@ ScoreBoard.prototype.cancel = function(id) {
   var scoreForThisId = this.scoring[id];
   postData("/score", {"final_score": this.score, "failed_at": id});
   this.score = 0;
+  this.comboFactor = 1;
+};
+
+ScoreBoard.prototype.increaseCombo = function() {
+  this.comboFactor *= 2;
+  if (this.comboFactor > this.maxComboFactor) {
+    this.comboFactor = this.maxComboFactor;
+  }
 };
 
 ScoreBoard.prototype.render = function() {
@@ -482,7 +493,7 @@ var Game = function($videoElement, $eventElement,
   this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
   this.shortcuts.bindTo($eventElement);
 
-  this.videoController.onEnd(function() { self.restart(); });
+  this.videoController.onEnd(function() { self.restartSuccessfully(); });
 
   this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
   this.eventQueue.onSuccess(function(id) { self.onSuccess(id); });
@@ -509,6 +520,11 @@ Game.prototype.load = function(fn) {
 
     self.loadVideo(settings.src, settings.startTime, settings.endTime, fn);
   });
+};
+
+Game.prototype.restartSuccessfully = function() {
+  this.scoreBoard.increaseCombo();
+  this.restart();
 };
 
 Game.prototype.restart = function() {
