@@ -53,9 +53,9 @@ def get_score_stats():
         high_score, average_score = 0, 0
     most_failed = get_most_failed()
     return {
-            'high_score': high_score,
-            'average_score': average_score,
-            'most_failed': most_failed
+            'high_score': int(high_score),
+            'average_score': float(average_score),
+            'most_failed': int(most_failed)
             }
 
 if __name__ == '__main__':
