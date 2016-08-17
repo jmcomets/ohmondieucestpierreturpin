@@ -1,9 +1,23 @@
+import os
+from urllib.parse import urlparse
 import datetime
-from peewee import Model, SqliteDatabase, IntegerField, DateTimeField, fn
+from peewee import Model, IntegerField, DateTimeField, fn
+from peewee import SqliteDatabase, PostgresqlDatabase
 
 __all__ = ('add_score', 'get_score_stats')
 
-db = SqliteDatabase('scores.db')
+try:
+    database_url = os.environ['DATABASE_URL']
+except KeyError:
+    this_dir = os.path.dirname(os.path.realpath(__file__))
+    db = SqliteDatabase(os.path.join(this_dir, 'scores.db'))
+else:
+    url = urlparse(database_url)
+    db = PostgresqlDatabase(url.path[1:],
+                            user=url.username,
+                            password=url.password,
+                            host=url.hostname,
+                            port=url.port)
 
 class ScoreEntry(Model):
     created_at = DateTimeField(default=datetime.datetime.now)
