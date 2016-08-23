@@ -244,13 +244,14 @@ VideoController.prototype.start = function() {
   // set timeout to notify end listeners
   var self = this;
   self.endTimeoutId = setTimeout(function() {
+    self.endTimeoutId = -1;
     self.notifyEnd();
   }, (self.endTime - self.startTime) * 1000);
 };
 
 VideoController.prototype.notifyEnd = function(fn) {
-  for (var i = 0; i < self.endListeners.length; i++) {
-    self.endListeners[i]();
+  for (var i = 0; i < this.endListeners.length; i++) {
+    this.endListeners[i]();
   }
 };
 
@@ -330,7 +331,7 @@ EventQueue.prototype.queueNextEvent = function() {
       console.error("could not set timeout, negative time");
     }
   } else {
-    console.error("no events left");
+    //console.error("no events left");
   }
 };
 
