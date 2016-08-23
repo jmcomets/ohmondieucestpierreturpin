@@ -11,19 +11,33 @@
   </head>
   <body>
     <div class="container">
+      <div id="loginStep" class="row">
+        <div class="push"></div>
+        <div class="col-md-12 text-center">
+          <form id="nickname-form" class="form-inline">
+            <div class="form-group">
+              <div class="input-group input-group-lg">
+                <input id="nickname" type="text" class="form-control" placeholder="Nickname">
+                <span class="input-group-btn">
+                    <button type="submit" class="btn btn-primary">
+                      <span class="glyphicon glyphicon-play"></span>
+                    </button>
+                </span>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div id="step1" class="row" style="display:none">
+        <div class="push"></div>
+        <div class="col-md-12 text-center">
+          <h2 id="counter-down" style="display:none"></h2>
+        </div>
+      </div>
       <div id="loadingStep" class="row" style="display:none">
         <div class="push"></div>
         <div class="col-md-6 col-md-offset-3 text-center">
           <img src="/static/img/loading.svg" style="width:66%" alt="Loading..."/>
-        </div>
-      </div>
-      <div id="step1" class="row">
-        <div class="push"></div>
-        <div class="col-md-12 text-center">
-          <button id="trigger" type="button" class="btn btn-primary btn-xl">
-            <span class="glyphicon glyphicon-play"></span>
-          </button>
-          <h2 id="counter-down" style="display:none"></h2>
         </div>
       </div>
       <div id="step2" class="row" style="display:none">

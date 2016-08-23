@@ -116,16 +116,17 @@ Button.prototype.makeElement = function() {
   return $btn;
 };
 
-var Controls = function() {
+var Controls = function($container) {
   this.listeners = [];
+  this.$container = $container;
 };
 
 Controls.prototype.configure = function(buttonDefinitions, baseId) {
   this.baseId = baseId;
   this.buttonDefinitions = buttonDefinitions;
-  this.buttons = this.makeButtons();
-  this.$e = this.makeElement();
   this.temporaryStatusTimeoutIds = {};
+  this.updateButtons();
+  this.render();
 };
 
 Controls.prototype.clearStatus = function(id) {
@@ -134,6 +135,17 @@ Controls.prototype.clearStatus = function(id) {
     this.clearTemporaryStatus(id);
     btn.clearStatus();
   }
+};
+
+Controls.prototype.render = function() {
+  var $e = $("<div></div>");
+  $e.addClass("btn-group-vertical");
+  for (var id in this.buttons) {
+    this.buttons[id].appendTo($e);
+  }
+
+  this.$container.html("");
+  $e.appendTo(this.$container);
 };
 
 Controls.prototype.setStatus = function(id, statusCode) {
@@ -193,10 +205,10 @@ Controls.prototype.getKeyIds = function() {
   return keyIds;
 };
 
-Controls.prototype.makeButtons = function() {
+Controls.prototype.updateButtons = function() {
   var self = this;
 
-  var buttons = {};
+  self.buttons = {};
   for (var id in self.buttonDefinitions) {
     id = parseInt(id);
 
@@ -207,23 +219,8 @@ Controls.prototype.makeButtons = function() {
       self.hit(self.baseId + id, type);
     });
 
-    buttons[id] = btn;
+    self.buttons[id] = btn;
   }
-
-  return buttons;
-};
-
-Controls.prototype.makeElement = function() {
-  var $e = $("<div></div>");
-  $e.addClass("btn-group-vertical");
-  for (var id in this.buttons) {
-    this.buttons[id].appendTo($e);
-  }
-  return $e;
-};
-
-Controls.prototype.appendTo = function($container) {
-  this.$e.appendTo($container);
 };
 
 var VideoController = function() {
@@ -379,7 +376,8 @@ function postData(url, data, success) {
   });
 }
 
-var ScoreBoard = function($elements) {
+var ScoreBoard = function(nickname, $elements) {
+  this.nickname = nickname;
   this.$elements = $elements;
 
   this.score = 0;
@@ -433,7 +431,7 @@ ScoreBoard.prototype.success = function(id) {
 
 ScoreBoard.prototype.cancel = function(id) {
   var scoreForThisId = this.scoring[id];
-  postData("/score", {"final_score": this.score, "failed_at": id});
+  postData("/score", {"nickname": this.nickname, "final_score": this.score, "failed_at": id});
   this.score = 0;
   this.comboFactor = 1;
   this.render();
@@ -483,20 +481,25 @@ ScoreBoard.prototype.render = function() {
   this.$elements.currentCombo.text(this.comboFactor);
 };
 
-var Game = function($videoElement, $eventElement, scoreBoardElements) {
-  this.$videoElement = $videoElement;
+var Game = function(nickname, $elements) {
+  this.$videoElement = $elements.video;
+
+  // disable right click on video
+  this.$videoElement.on("contextmenu", function(e) { return false; });
 
   this.videoController = new VideoController();
-  this.controls = new Controls();
+  this.controls = new Controls($elements.controls);
   this.shortcuts = new Shortcuts();
   this.eventQueue = new EventQueue();
-  this.scoreBoard = new ScoreBoard(scoreBoardElements);
+  this.scoreBoard = new ScoreBoard(nickname, $elements.scoreBoardElements);
 
   var self = this;
 
   this.shortcuts.onPress(function(code)   { self.controls.hit(code, "press"); });
   this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
-  this.shortcuts.bindTo($eventElement);
+  this.shortcuts.bindTo($elements.events);
+
+  this.shortcuts.accept(this.controls.getKeyIds());
 
   this.videoController.onEnd(function() { self.restartSuccessfully(); });
 
@@ -505,9 +508,7 @@ var Game = function($videoElement, $eventElement, scoreBoardElements) {
   this.eventQueue.onCancel(function(id) { self.onCancel(id); });
 };
 
-Game.prototype.start = function($controlsElement) {
-  this.shortcuts.accept(this.controls.getKeyIds());
-  this.controls.appendTo($controlsElement);
+Game.prototype.start = function() {
   this.videoController.start();
   this.scoreBoard.startPolling();
   this.eventQueue.start();
@@ -553,13 +554,11 @@ Game.prototype.loadVideo = function(src, startTime, endTime, fn) {
   var self = this;
   self.$videoElement.find("source").first().attr("src", src);
   var video = self.$videoElement.get(0);
-  video.oncanplay = function() {
+  video.addEventListener("loadedmetadata", function() {
     self.videoController.configure(video, startTime, endTime);
-    video.oncanplay = null;
 
-    // all is loaded
     fn();
-  };
+  });
   video.load();
 };
 
@@ -570,57 +569,55 @@ Game.prototype.getSettings = function(fn) {
 }
 
 $(function() {
-  // dom objects
-  var $controls = $("#controls");
-
-  // step objects
-  var $step1 = $("#step1");
-  var $step2 = $("#step2");
-  var $step3 = $("#step3");
-  var $loadingStep = $("#loadingStep");
-
-  // disable right click on video
-  var $video = $("#video");
-  $video.on("contextmenu", function(e) {
-    return false;
-  });
-
   // disable focus on buttons (Bootstrap)
   $(".btn").on("mouseup", function(){ $(this).blur(); });
-  //$(".btn").on("touchend", function(){ $(this).blur(); });
 
-  var game = new Game($video, $(window), {
-    currentScore: $("#current-score"),
-    currentCombo: $("#current-combo"),
-    highScore: $("#high-score"),
-    averageScore: $("#average-score"),
-    mostFailed: $("#most-failed")
-  });
+  var $nicknameForm = $("#nickname-form");
+  var $nickname = $("#nickname");
+  $nicknameForm.submit(function(e) {
+    e.preventDefault();
 
-  // TODO: move to settings.json
-  // var countDownDuration = 3000;
-  // var flashDuration = 3;
-  var countDownDuration = 0.5;
-  var flashDuration = 0.5;
+    var nickname = $.trim($nickname.val());
+    if (!nickname) {
+      return false;
+    }
 
-  var $counterDown = $("#counter-down");
+    $("#loginStep").hide();
 
-  $counterDown.text(countDownDuration * 1000);
-
-  $counterDown.counter({
-    autoStart: false,
-    countTo: 0,
-    duration: countDownDuration * 1000,
-    easing: "easeOutCubic"
-  });
-
-  var $button = $("#trigger");
-  $button.click(function() {
-    $button.hide();
-
+    // load the game info
+    var $loadingStep = $("#loadingStep");
     $loadingStep.show();
+
+    var game = new Game(nickname, {
+      controls: $("#controls"),
+      events:   $(window),
+      video:    $("#video"),
+      scoreBoardElements: {
+        averageScore: $("#average-score"),
+        currentCombo: $("#current-combo"),
+        currentScore: $("#current-score"),
+        highScore:    $("#high-score"),
+        mostFailed:   $("#most-failed")
+      }
+    });
+
     game.load(function() {
       $loadingStep.hide();
+
+      // TODO: move to settings
+      var countDownDuration = 0.5;
+      var flashDuration = 0.5;
+
+      var $counterDown = $("#counter-down");
+
+      $counterDown.text(countDownDuration * 1000);
+
+      $counterDown.counter({
+        autoStart: false,
+        countTo: 0,
+        duration: countDownDuration * 1000,
+        easing: "easeOutCubic"
+      });
 
       // show and start the countdown
       $counterDown.fadeIn();
@@ -628,12 +625,16 @@ $(function() {
 
       // welcome to callback hell
       setTimeout(function() {
+        var $step1 = $("#step1");
+        var $step2 = $("#step2");
+        var $step3 = $("#step3");
+
         $step1.fadeOut(function() {
           $step2.fadeIn(function() {
             setTimeout(function() {
               $step2.fadeOut(function() {
                 $step3.fadeIn(function() {
-                  game.start($controls);
+                  game.start();
                 });
               });
             }, flashDuration * 1000)

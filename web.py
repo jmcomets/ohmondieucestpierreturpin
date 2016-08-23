@@ -25,10 +25,11 @@ def post_score():
     try:
         final_score = int(data['final_score'])
         failed_at = int(data['failed_at'])
+        nickname = data['nickname']
     except KeyError:
         return abort(400)
     try:
-        add_score(final_score, failed_at)
+        add_score(nickname, final_score, failed_at)
     except ValueError:
         return abort(400)
     else:

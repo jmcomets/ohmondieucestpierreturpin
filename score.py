@@ -1,7 +1,7 @@
 import os
 from urllib.parse import urlparse
 import datetime
-from peewee import Model, IntegerField, DateTimeField, fn
+from peewee import Model, IntegerField, DateTimeField, CharField, fn
 from peewee import SqliteDatabase, PostgresqlDatabase
 
 __all__ = ('add_score', 'get_score_stats')
@@ -24,14 +24,15 @@ class ScoreEntry(Model):
 
     final_score = IntegerField()
     failed_at = IntegerField()
+    nickname = CharField(max_length=15)
 
     class Meta:
         database = db
 
-def add_score(final_score, failed_at):
+def add_score(nickname, final_score, failed_at):
     if final_score < 0 or failed_at not in range(1, 9 + 1):
         raise ValueError
-    ScoreEntry.create(final_score=final_score, failed_at=failed_at)
+    ScoreEntry.create(nickname=nickname, final_score=final_score, failed_at=failed_at)
 
 def get_fail_counts():
     for entry in (ScoreEntry
