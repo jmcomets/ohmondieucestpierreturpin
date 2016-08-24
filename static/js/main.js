@@ -524,7 +524,7 @@ Game.prototype.load = function(fn) {
 
     self.scoreBoard.configure(settings.buttonDefinitions, settings.scoring, settings.pollRate);
 
-    self.loadVideo(settings.src, settings.startTime, settings.endTime, fn);
+    self.loadVideo(settings.sources, settings.startTime, settings.endTime, fn);
   });
 };
 
@@ -550,15 +550,25 @@ Game.prototype.onCancel = function(id) {
   this.restart();
 };
 
-Game.prototype.loadVideo = function(src, startTime, endTime, fn) {
+Game.prototype.loadVideo = function(sources, startTime, endTime, fn) {
+  // add sources
+  for (var i = 0; i < sources.length; i++) {
+    var $source = $("<source />")
+      .attr("src", sources[i].src)
+      .attr("type", sources[i].type);
+    this.$videoElement.append($source);
+  }
+
   var self = this;
-  self.$videoElement.find("source").first().attr("src", src);
-  var video = self.$videoElement.get(0);
-  video.addEventListener("loadedmetadata", function() {
+  var video = this.$videoElement.get(0);
+
+  self.$videoElement.one("canplaythrough", function() {
     self.videoController.configure(video, startTime, endTime);
 
+    // all is loaded
     fn();
   });
+
   video.load();
 };
 
