@@ -507,8 +507,6 @@ var Game = function(nickname, $elements) {
   this.shortcuts.onRelease(function(code) { self.controls.hit(code, "release"); });
   this.shortcuts.bindTo($elements.events);
 
-  this.shortcuts.accept(this.controls.getKeyIds());
-
   this.videoController.onEnd(function() { self.restartSuccessfully(); });
 
   this.controls.onHit(function(id) { self.eventQueue.handleEvent(id); });
@@ -526,6 +524,8 @@ Game.prototype.load = function(fn) {
   var self = this;
   this.getSettings(function(settings) {
     self.controls.configure(settings.buttonDefinitions, settings.baseId);
+
+    self.shortcuts.accept(self.controls.getKeyIds());
 
     self.eventQueue.configure(settings.allowedError);
     self.eventQueue.setEvents(settings.events);
