@@ -4,7 +4,7 @@ import datetime
 from peewee import Model, IntegerField, DateTimeField, CharField, fn
 from peewee import SqliteDatabase, PostgresqlDatabase
 
-__all__ = ('add_score', 'get_score_stats')
+__all__ = ('add_score', 'get_score_stats', 'db')
 
 try:
     database_url = os.environ['DATABASE_URL']
@@ -35,7 +35,9 @@ class ScoreEntry(Model):
 def add_score(nickname, final_score, failed_at):
     if final_score < 0 or failed_at not in range(1, 9 + 1):
         raise ValueError
-    ScoreEntry.create(nickname=nickname, final_score=final_score, failed_at=failed_at)
+    ScoreEntry.create(nickname=nickname,
+                      final_score=final_score,
+                      failed_at=failed_at)
 
 def get_high_and_average_scores():
     high_score, average_score = (ScoreEntry
@@ -47,7 +49,9 @@ def get_high_and_average_scores():
     return high_score, average_score
 
 def get_high_score_holder():
-    results = ScoreEntry.select(ScoreEntry.nickname, fn.Max(ScoreEntry.final_score))
+    results = (ScoreEntry
+               .select(ScoreEntry.nickname, fn.Max(ScoreEntry.final_score))
+               .group_by(ScoreEntry.nickname))
     if results:
         return results[0].nickname
 

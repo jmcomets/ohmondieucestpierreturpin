@@ -253,7 +253,7 @@ VideoController.prototype.onEnd = function(fn) {
 
 VideoController.prototype.restart = function() {
   this.video.play();
-  this.video.currentTime = 0;
+  this.video.currentTime = 0.0;
 };
 
 function getTimestamp() {

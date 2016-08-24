@@ -1,6 +1,6 @@
 import json
 from flask import Flask, request, g, jsonify, abort
-from score import get_score_stats, add_score
+from score import get_score_stats, add_score, db
 
 app = Flask('ohmondieucestpierreturpin')
 
@@ -29,11 +29,21 @@ def post_score():
     except KeyError:
         return abort(400)
     try:
-        add_score(nickname, final_score, failed_at)
+        with db.transaction():
+            add_score(nickname, final_score, failed_at)
     except ValueError:
         return abort(400)
     else:
         return ''
+
+@app.before_request
+def before_request():
+    db.connect()
+
+@app.after_request
+def after_request(response):
+    db.close()
+    return response
 
 if __name__ == '__main__':
     import sys
