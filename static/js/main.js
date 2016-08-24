@@ -384,6 +384,7 @@ var ScoreBoard = function(nickname, $elements) {
   this.highScore = -1;
   this.mostFailed = -1;
   this.averageScore = -1;
+  this.highScoreHolder = '';
 
   this.pollTimeoutId = -1;
 
@@ -413,6 +414,7 @@ ScoreBoard.prototype.startPolling = function() {
 ScoreBoard.prototype.load = function(fn) {
   var self = this;
   $.getJSON("/score", function(scores) {
+    self.highScoreHolder = scores["high_score_holder"];
     self.highScore = Math.floor(scores["high_score"]);
     self.averageScore = Math.floor(scores["average_score"]);
     self.mostFailed = Math.floor(scores["most_failed"]);
@@ -454,13 +456,19 @@ ScoreBoard.prototype.render = function() {
   // high score
   var beatingHighScore = this.score > this.highScore;
   var highScore = beatingHighScore ? this.score : this.highScore;
+  var highScoreHolder = beatingHighScore ? this.nickname : this.highScoreHolder;
   this.$elements.highScore.attr("class", "label label-as-badge");
   if (beatingHighScore) {
     this.$elements.highScore.addClass("label-success");
   } else {
     this.$elements.highScore.addClass("label-default");
   }
-  this.$elements.highScore.text(highScore);
+
+  var highScoreText = highScore;
+  if (highScoreHolder) {
+    highScoreText += " (" + highScoreHolder + ")";
+  }
+  this.$elements.highScore.text(highScoreText);
 
   // average score
   var overAverageScore = this.score > this.averageScore;

@@ -29,10 +29,27 @@ class ScoreEntry(Model):
     class Meta:
         database = db
 
+    def __unicode__(self):
+        return 'nickname={}, final_score={}, failed_at={}'.format(self.nickname, self.final_score, self.failed_at)
+
 def add_score(nickname, final_score, failed_at):
     if final_score < 0 or failed_at not in range(1, 9 + 1):
         raise ValueError
     ScoreEntry.create(nickname=nickname, final_score=final_score, failed_at=failed_at)
+
+def get_high_and_average_scores():
+    high_score, average_score = (ScoreEntry
+                                 .select(fn.Max(ScoreEntry.final_score),
+                                         fn.Avg(ScoreEntry.final_score))
+                                 .scalar(as_tuple=True))
+    if (high_score, average_score) == (None, None):
+        high_score, average_score = 0, 0
+    return high_score, average_score
+
+def get_high_score_holder():
+    results = ScoreEntry.select(ScoreEntry.nickname, fn.Max(ScoreEntry.final_score))
+    if results:
+        return results[0].nickname
 
 def get_fail_counts():
     for entry in (ScoreEntry
@@ -46,14 +63,11 @@ def get_most_failed():
     return max(get_fail_counts(), key=lambda fc: fc[1], default=(-1, 0))[0]
 
 def get_score_stats():
-    high_score, average_score = (ScoreEntry
-                                 .select(fn.Max(ScoreEntry.final_score),
-                                         fn.Avg(ScoreEntry.final_score))
-                                 .scalar(as_tuple=True))
-    if (high_score, average_score) == (None, None):
-        high_score, average_score = 0, 0
+    high_score_holder = get_high_score_holder()
+    high_score, average_score = get_high_and_average_scores()
     most_failed = get_most_failed()
     return {
+            'high_score_holder': high_score_holder,
             'high_score': int(high_score),
             'average_score': float(average_score),
             'most_failed': int(most_failed)
