@@ -224,26 +224,21 @@ Controls.prototype.updateButtons = function() {
 };
 
 var VideoController = function() {
-  this.endTimeoutId = -1;
   this.endListeners = [];
 };
 
-VideoController.prototype.configure = function(video, startTime, endTime) {
+VideoController.prototype.configure = function(video) {
   this.video = video;
-  this.startTime = startTime;
-  this.endTime = endTime;
 };
 
 VideoController.prototype.start = function() {
   this.video.play();
-  this.video.currentTime = this.startTime;
 
   // set timeout to notify end listeners
   var self = this;
-  self.endTimeoutId = setTimeout(function() {
-    self.endTimeoutId = -1;
+  this.video.addEventListener("ended", function() {
     self.notifyEnd();
-  }, (self.endTime - self.startTime) * 1000);
+  }, false);
 };
 
 VideoController.prototype.notifyEnd = function(fn) {
@@ -257,11 +252,8 @@ VideoController.prototype.onEnd = function(fn) {
 };
 
 VideoController.prototype.restart = function() {
-  if (this.endTimeoutId != -1) {
-    clearTimeout(this.endTimeoutId);
-    this.endTimeoutId = -1;
-  }
-  this.start();
+  this.video.play();
+  this.video.currentTime = 0;
 };
 
 function getTimestamp() {
@@ -532,7 +524,7 @@ Game.prototype.load = function(fn) {
 
     self.scoreBoard.configure(settings.buttonDefinitions, settings.scoring, settings.pollRate);
 
-    self.loadVideo(settings.sources, settings.startTime, settings.endTime, fn);
+    self.loadVideo(settings.sources, fn);
   });
 };
 
@@ -558,7 +550,7 @@ Game.prototype.onCancel = function(id) {
   this.restart();
 };
 
-Game.prototype.loadVideo = function(sources, startTime, endTime, fn) {
+Game.prototype.loadVideo = function(sources, fn) {
   // add sources
   for (var i = 0; i < sources.length; i++) {
     var $source = $("<source />")
@@ -571,7 +563,7 @@ Game.prototype.loadVideo = function(sources, startTime, endTime, fn) {
   var video = this.$videoElement.get(0);
 
   self.$videoElement.one("canplaythrough", function() {
-    self.videoController.configure(video, startTime, endTime);
+    self.videoController.configure(video);
 
     // all is loaded
     fn();
