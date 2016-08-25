@@ -50,8 +50,9 @@ def get_high_and_average_scores():
 
 def get_high_score_holder():
     results = (ScoreEntry
-               .select(ScoreEntry.nickname, fn.Max(ScoreEntry.final_score))
-               .group_by(ScoreEntry.nickname))
+               .select(ScoreEntry.nickname)
+               .group_by(ScoreEntry.nickname)
+               .order_by(ScoreEntry.final_score.desc()))
     if results:
         return results[0].nickname
 
