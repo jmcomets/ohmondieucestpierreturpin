@@ -226,7 +226,10 @@ Controls.prototype.updateButtons = function() {
 var VideoController = function($element) {
   this.endListeners = [];
   this.$element = $element;
-  this.$element.hide();
+};
+
+VideoController.prototype.setSources = function(sources) {
+  this.sources = sources;
 };
 
 VideoController.prototype.loadVideo = function(fn) {
@@ -251,19 +254,17 @@ VideoController.prototype.loadVideo = function(fn) {
   });
 
   this.video.load();
-  this.video.play();
-  this.video.volume = 0;
-};
 
-VideoController.prototype.setSources = function(sources) {
-  this.sources = sources;
+  //this.$element.hide();
+  //this.video.play();
+  //this.video.volume = 0;
 };
 
 VideoController.prototype.start = function() {
-  this.$element.show();
   this.video.play();
-  this.video.currentTime = 0;
-  this.video.volume = 1;
+  //this.$element.show();
+  //this.video.currentTime = 0;
+  //this.video.volume = 1;
 
   // set timeout to notify end listeners
   var self = this;
@@ -636,40 +637,21 @@ $(function() {
             $loadingStep.fadeIn(function() {
               game.loadVideo(function() {
                 $loadingStep.fadeOut(fadeDuration, function() {
-                  var $counterDown = $("#counter-down");
 
-                  var numberFormatter = function(n) {
-                    return Math.ceil(n / 1000);
-                  };
+                  // show a flash message
+                  var $flashStep = $("#flashStep");
+                  $flashStep.fadeIn(fadeDuration, function() {
+                    setTimeout(function() {
+                      $flashStep.fadeOut(fadeDuration, function() {
 
-                  $counterDown.counter({
-                    autoStart: false,
-                    countTo: 0,
-                    countFrom: countDownDuration,
-                    placeholder: numberFormatter(countDownDuration),
-                    numberFormatter: numberFormatter,
-                    onComplete: function() {
-                      var $step2 = $("#step2");
-                      var $step3 = $("#step3");
-
-                      $step1.fadeOut(fadeDuration, function() {
-                        $step2.fadeIn(fadeDuration, function() {
-                          setTimeout(function() {
-                            $step2.fadeOut(fadeDuration, function() {
-                              $step3.fadeIn(fadeDuration, function() {
-                                game.start();
-                              });
-                            });
-                          }, flashDuration)
+                        // show the game panel
+                        var $gamePanel = $("#gamePanel");
+                        $gamePanel.fadeIn(fadeDuration, function() {
+                          game.start();
                         });
                       });
-                    }
+                    }, flashDuration)
                   });
-
-                  // show and start the countdown
-                  var $step1 = $("#step1");
-                  $step1.show();
-                  $counterDown.counter("start");
                 });
               });
             });
@@ -678,5 +660,4 @@ $(function() {
       });
     });
   });
-
 });
