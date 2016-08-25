@@ -223,12 +223,37 @@ Controls.prototype.updateButtons = function() {
   }
 };
 
-var VideoController = function() {
+var VideoController = function($element) {
   this.endListeners = [];
+  this.$element = $element;
 };
 
-VideoController.prototype.configure = function(video) {
-  this.video = video;
+VideoController.prototype.loadVideo = function(fn) {
+  // add sources
+  for (var i = 0; i < this.sources.length; i++) {
+    var $source = $("<source />")
+      .attr("src", this.sources[i].src)
+      .attr("type", this.sources[i].type);
+    this.$element.append($source);
+  }
+
+  this.video = this.$element.get(0);
+
+  // disable right click on video
+  this.$element.on("contextmenu", function(e) {
+    return false;
+  });
+
+  // f**king fire callback
+  this.$element.one("canplaythrough", function() {
+    fn();
+  });
+
+  this.video.load();
+};
+
+VideoController.prototype.setSources = function(sources) {
+  this.sources = sources;
 };
 
 VideoController.prototype.start = function() {
@@ -482,12 +507,7 @@ ScoreBoard.prototype.render = function() {
 };
 
 var Game = function(nickname, $elements) {
-  this.$videoElement = $elements.video;
-
-  // disable right click on video
-  this.$videoElement.on("contextmenu", function(e) { return false; });
-
-  this.videoController = new VideoController();
+  this.videoController = new VideoController($elements.video);
   this.controls = new Controls($elements.controls);
   this.shortcuts = new Shortcuts();
   this.eventQueue = new EventQueue();
@@ -512,7 +532,7 @@ Game.prototype.start = function() {
   this.eventQueue.start();
 };
 
-Game.prototype.load = function(fn) {
+Game.prototype.loadSettings = function(fn) {
   var self = this;
   this.getSettings(function(settings) {
     self.controls.configure(settings.buttonDefinitions, settings.baseId);
@@ -524,7 +544,9 @@ Game.prototype.load = function(fn) {
 
     self.scoreBoard.configure(settings.buttonDefinitions, settings.scoring, settings.pollRate);
 
-    self.loadVideo(settings.sources, fn);
+    self.videoController.setSources(settings.sources);
+
+    fn();
   });
 };
 
@@ -550,26 +572,8 @@ Game.prototype.onCancel = function(id) {
   this.restart();
 };
 
-Game.prototype.loadVideo = function(sources, fn) {
-  // add sources
-  for (var i = 0; i < sources.length; i++) {
-    var $source = $("<source />")
-      .attr("src", sources[i].src)
-      .attr("type", sources[i].type);
-    this.$videoElement.append($source);
-  }
-
-  var self = this;
-  var video = this.$videoElement.get(0);
-
-  self.$videoElement.one("canplaythrough", function() {
-    self.videoController.configure(video);
-
-    // all is loaded
-    fn();
-  });
-
-  video.load();
+Game.prototype.loadVideo = function(fn) {
+  this.videoController.loadVideo(fn);
 };
 
 Game.prototype.getSettings = function(fn) {
@@ -582,76 +586,84 @@ $(function() {
   // disable focus on buttons (Bootstrap)
   $(".btn").on("mouseup", function(){ $(this).blur(); });
 
-  var $nicknameForm = $("#nickname-form");
-  var $nickname = $("#nickname");
-  $nicknameForm.submit(function(e) {
-    e.preventDefault();
-
-    var nickname = $.trim($nickname.val());
-    if (!nickname) {
-      return false;
+  var game = new Game(nickname, {
+    controls: $("#controls"),
+    events:   $(window),
+    video:    $("#video"),
+    scoreBoardElements: {
+      averageScore: $("#average-score"),
+      currentCombo: $("#current-combo"),
+      currentScore: $("#current-score"),
+      highScore:    $("#high-score"),
+      mostFailed:   $("#most-failed")
     }
+  });
 
-    $("#loginStep").hide();
+  var $loadingStep = $("#loadingStep");
+  $loadingStep.show();
 
-    // load the game info
-    var $loadingStep = $("#loadingStep");
-    $loadingStep.show();
+  game.loadSettings(function() {
+    $loadingStep.hide();
 
-    var game = new Game(nickname, {
-      controls: $("#controls"),
-      events:   $(window),
-      video:    $("#video"),
-      scoreBoardElements: {
-        averageScore: $("#average-score"),
-        currentCombo: $("#current-combo"),
-        currentScore: $("#current-score"),
-        highScore:    $("#high-score"),
-        mostFailed:   $("#most-failed")
+    var $loginStep = $("#loginStep");
+    $loginStep.show();
+
+    var $nicknameForm = $("#nickname-form");
+    var $nickname = $("#nickname");
+    $nicknameForm.one("submit", function(e) {
+      e.preventDefault();
+
+      var nickname = $.trim($nickname.val());
+      if (!nickname) {
+        return false;
       }
-    });
 
-    game.load(function() {
-      $loadingStep.hide();
+      $loginStep.hide();
 
-      // TODO: move to settings
-      var countDownDuration = 0.5;
-      var flashDuration = 0.5;
+      $loadingStep.show();
 
-      var $counterDown = $("#counter-down");
+      game.loadVideo(function() {
+        $loadingStep.hide();
 
-      $counterDown.text(countDownDuration * 1000);
+        // TODO: move to settings
+        var countDownDuration = 0.5;
+        var flashDuration = 0.5;
 
-      $counterDown.counter({
-        autoStart: false,
-        countTo: 0,
-        duration: countDownDuration * 1000,
-        easing: "easeOutCubic"
-      });
+        var $counterDown = $("#counter-down");
 
-      // show and start the countdown
-      $counterDown.fadeIn();
-      $counterDown.counter("start");
+        $counterDown.text(countDownDuration * 1000);
 
-      // welcome to callback hell
-      setTimeout(function() {
-        var $step1 = $("#step1");
-        var $step2 = $("#step2");
-        var $step3 = $("#step3");
-
-        $step1.fadeOut(function() {
-          $step2.fadeIn(function() {
-            setTimeout(function() {
-              $step2.fadeOut(function() {
-                $step3.fadeIn(function() {
-                  game.start();
-                });
-              });
-            }, flashDuration * 1000)
-          });
+        $counterDown.counter({
+          autoStart: false,
+          countTo: 0,
+          duration: countDownDuration * 1000,
+          easing: "easeOutCubic"
         });
 
-      }, countDownDuration);
+        // show and start the countdown
+        $counterDown.fadeIn();
+        $counterDown.counter("start");
+
+        // welcome to callback hell
+        setTimeout(function() {
+          var $step1 = $("#step1");
+          var $step2 = $("#step2");
+          var $step3 = $("#step3");
+
+          $step1.fadeOut(function() {
+            $step2.fadeIn(function() {
+              setTimeout(function() {
+                $step2.fadeOut(function() {
+                  $step3.fadeIn(function() {
+                    game.start();
+                  });
+                });
+              }, flashDuration * 1000)
+            });
+          });
+
+        }, countDownDuration);
+      });
     });
   });
 
