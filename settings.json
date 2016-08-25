@@ -4,7 +4,7 @@
         "type": "video/mp4"
     }],
     "pollRate": 5,
-    "allowedError": 1,
+    "allowedError": 0.5,
     "baseId": 48,
     "buttonDefinitions": {
         "1": "They're taking the Hobbits",
