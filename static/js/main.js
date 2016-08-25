@@ -254,17 +254,12 @@ VideoController.prototype.loadVideo = function(fn) {
   });
 
   this.video.load();
-
-  //this.$element.hide();
-  //this.video.play();
-  //this.video.volume = 0;
+  this.video.play();
+  this.video.pause();
 };
 
 VideoController.prototype.start = function() {
   this.video.play();
-  //this.$element.show();
-  //this.video.currentTime = 0;
-  //this.video.volume = 1;
 
   // set timeout to notify end listeners
   var self = this;
@@ -624,38 +619,33 @@ $(function() {
         var $nicknameForm = $("#nickname-form");
         var $nickname = $("#nickname");
         $nicknameForm.one("submit", function(e) {
-          e.preventDefault();
-
           var nickname = $.trim($nickname.val());
           if (!nickname) {
             return false;
           }
 
-          $loginStep.animate({
-            top: "-100%"
-          }, loginSlideDuration, function() {
-            $loadingStep.fadeIn(function() {
-              game.loadVideo(function() {
-                $loadingStep.fadeOut(fadeDuration, function() {
+          $loginStep.animate({ top: "-100%" }, loginSlideDuration);
 
-                  // show a flash message
-                  var $flashStep = $("#flashStep");
-                  $flashStep.fadeIn(fadeDuration, function() {
-                    setTimeout(function() {
-                      $flashStep.fadeOut(fadeDuration, function() {
+          $loadingStep.fadeIn();
+          game.loadVideo(function() {
+            $loadingStep.fadeOut(fadeDuration, function() {
 
-                        // show the game panel
-                        var $gamePanel = $("#gamePanel");
-                        $gamePanel.fadeIn(fadeDuration, function() {
-                          game.start();
-                        });
-                      });
-                    }, flashDuration)
+              // show a flash message
+              $("#flashStep")
+                .fadeIn(fadeDuration)
+                .delay(flashDuration)
+                .fadeOut(fadeDuration, function() {
+
+                  // show the game panel
+                  var $gamePanel = $("#gamePanel");
+                  $gamePanel.fadeIn(fadeDuration, function() {
+                    game.start();
                   });
                 });
-              });
             });
           });
+
+          e.preventDefault();
         });
       });
     });
