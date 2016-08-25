@@ -226,6 +226,7 @@ Controls.prototype.updateButtons = function() {
 var VideoController = function($element) {
   this.endListeners = [];
   this.$element = $element;
+  this.$element.hide();
 };
 
 VideoController.prototype.loadVideo = function(fn) {
@@ -251,7 +252,7 @@ VideoController.prototype.loadVideo = function(fn) {
 
   this.video.load();
   this.video.play();
-  this.video.pause();
+  this.video.volume = 0;
 };
 
 VideoController.prototype.setSources = function(sources) {
@@ -259,7 +260,10 @@ VideoController.prototype.setSources = function(sources) {
 };
 
 VideoController.prototype.start = function() {
+  this.$element.show();
   this.video.play();
+  this.video.currentTime = 0;
+  this.video.volume = 1;
 
   // set timeout to notify end listeners
   var self = this;
