@@ -249,9 +249,15 @@ VideoController.prototype.loadVideo = function(fn) {
   });
 
   // f**king fire callback
-  this.$element.one("canplaythrough", function() {
+  this.video.oncanplaythrough = function() {
     fn();
-  });
+  };
+
+  if (this.video.readyState > 3) {
+    this.video.oncanplaythrough = null;
+
+    fn();
+  }
 
   this.video.load();
   this.video.play();
