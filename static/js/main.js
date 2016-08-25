@@ -250,7 +250,10 @@
     });
 
     // f**king fire callback
+    var self = this;
     this.video.oncanplaythrough = function() {
+      self.video.oncanplaythrough = null;
+
       fn();
     };
 
