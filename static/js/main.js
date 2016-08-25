@@ -250,6 +250,8 @@ VideoController.prototype.loadVideo = function(fn) {
   });
 
   this.video.load();
+  this.video.play();
+  this.video.pause();
 };
 
 VideoController.prototype.setSources = function(sources) {
