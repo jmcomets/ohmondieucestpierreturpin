@@ -395,8 +395,7 @@ function postData(url, data, success) {
   });
 }
 
-var ScoreBoard = function(nickname, $elements) {
-  this.nickname = nickname;
+var ScoreBoard = function($elements) {
   this.$elements = $elements;
 
   this.score = 0;
@@ -415,6 +414,10 @@ ScoreBoard.prototype.configure = function(buttonDefinitions, scoring, pollRate) 
   this.buttonDefinitions = buttonDefinitions;
   this.scoring = scoring;
   this.pollRate = pollRate;
+};
+
+ScoreBoard.prototype.setNickname = function(nickname) {
+  this.nickname = nickname;
 };
 
 ScoreBoard.prototype.startPolling = function() {
@@ -508,12 +511,12 @@ ScoreBoard.prototype.render = function() {
   this.$elements.currentCombo.text(this.comboFactor);
 };
 
-var Game = function(nickname, $elements) {
+var Game = function($elements) {
   this.videoController = new VideoController($elements.video);
   this.controls = new Controls($elements.controls);
   this.shortcuts = new Shortcuts();
   this.eventQueue = new EventQueue();
-  this.scoreBoard = new ScoreBoard(nickname, $elements.scoreBoardElements);
+  this.scoreBoard = new ScoreBoard($elements.scoreBoardElements);
 
   var self = this;
 
@@ -532,6 +535,10 @@ Game.prototype.start = function() {
   this.videoController.start();
   this.scoreBoard.startPolling();
   this.eventQueue.start();
+};
+
+Game.prototype.setNickname = function(nickname) {
+  this.scoreBoard.setNickname(nickname);
 };
 
 Game.prototype.loadSettings = function(fn) {
@@ -588,7 +595,7 @@ $(function() {
   // disable focus on buttons (Bootstrap)
   $(".btn").on("mouseup", function(){ $(this).blur(); });
 
-  var game = new Game(nickname, {
+  var game = new Game({
     controls: $("#controls"),
     events:   $(window),
     video:    $("#video"),
@@ -623,6 +630,8 @@ $(function() {
           if (!nickname) {
             return false;
           }
+
+          game.setNickname(nickname);
 
           $loginStep.animate({ top: "-100%" }, loginSlideDuration);
 
