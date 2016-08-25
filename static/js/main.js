@@ -604,67 +604,73 @@ $(function() {
   var $loadingStep = $("#loadingStep");
   $loadingStep.show();
 
+  var countDownDuration  = 3 * 1000;
+  var flashDuration      = 0.5 * 1000;
+  var fadeDuration       = 0.4 * 1000;
+  var loginSlideDuration = 0.8 * 1000;
+
   game.loadSettings(function() {
-    $loadingStep.hide();
+    $loadingStep.fadeOut(fadeDuration, function() {
+      var $loginStep = $("#loginStep");
+      $loginStep.animate({
+        top: "0%",
+      }, loginSlideDuration, function() {
 
-    var $loginStep = $("#loginStep");
-    $loginStep.show();
+        var $nicknameForm = $("#nickname-form");
+        var $nickname = $("#nickname");
+        $nicknameForm.one("submit", function(e) {
+          e.preventDefault();
 
-    var $nicknameForm = $("#nickname-form");
-    var $nickname = $("#nickname");
-    $nicknameForm.one("submit", function(e) {
-      e.preventDefault();
+          var nickname = $.trim($nickname.val());
+          if (!nickname) {
+            return false;
+          }
 
-      var nickname = $.trim($nickname.val());
-      if (!nickname) {
-        return false;
-      }
+          $loginStep.animate({
+            top: "-100%"
+          }, loginSlideDuration, function() {
+            $loadingStep.fadeIn(function() {
+              game.loadVideo(function() {
+                $loadingStep.fadeOut(fadeDuration, function() {
+                  var $counterDown = $("#counter-down");
 
-      $loginStep.hide();
+                  var numberFormatter = function(n) {
+                    return Math.ceil(n / 1000);
+                  };
 
-      $loadingStep.show();
+                  $counterDown.counter({
+                    autoStart: false,
+                    countTo: 0,
+                    countFrom: countDownDuration,
+                    placeholder: numberFormatter(countDownDuration),
+                    numberFormatter: numberFormatter,
+                    onComplete: function() {
+                      var $step2 = $("#step2");
+                      var $step3 = $("#step3");
 
-      game.loadVideo(function() {
-        $loadingStep.hide();
-
-        // TODO: move to settings
-        var countDownDuration = 0.5;
-        var flashDuration = 0.5;
-
-        var $counterDown = $("#counter-down");
-
-        $counterDown.text(countDownDuration * 1000);
-
-        $counterDown.counter({
-          autoStart: false,
-          countTo: 0,
-          duration: countDownDuration * 1000,
-          easing: "easeOutCubic"
-        });
-
-        // show and start the countdown
-        $counterDown.fadeIn();
-        $counterDown.counter("start");
-
-        // welcome to callback hell
-        setTimeout(function() {
-          var $step1 = $("#step1");
-          var $step2 = $("#step2");
-          var $step3 = $("#step3");
-
-          $step1.fadeOut(function() {
-            $step2.fadeIn(function() {
-              setTimeout(function() {
-                $step2.fadeOut(function() {
-                  $step3.fadeIn(function() {
-                    game.start();
+                      $step1.fadeOut(fadeDuration, function() {
+                        $step2.fadeIn(fadeDuration, function() {
+                          setTimeout(function() {
+                            $step2.fadeOut(fadeDuration, function() {
+                              $step3.fadeIn(fadeDuration, function() {
+                                game.start();
+                              });
+                            });
+                          }, flashDuration)
+                        });
+                      });
+                    }
                   });
+
+                  // show and start the countdown
+                  var $step1 = $("#step1");
+                  $step1.show();
+                  $counterDown.counter("start");
                 });
-              }, flashDuration * 1000)
+              });
             });
           });
-
-        }, countDownDuration);
+        });
       });
     });
   });
